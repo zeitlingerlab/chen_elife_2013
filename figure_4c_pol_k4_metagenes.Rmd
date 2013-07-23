@@ -1,0 +1,115 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+library(plyr)
+
+knitr.figure_dir <- "figure_4c_pol_k4_metagenes_output"
+source("shared_code/knitr_common.r")
+````
+
+# Figure: Pol II and K4me3 metagene plots
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Pre-normalized enrichment
+
+We'd like to show the following metagene profiles:
+
+* **MBT stage**
+    - All first wave 
+    - Second wave maternal
+
+Metagene enrichments were calculated and saved (see [generate_metagene_data_for_all_groups.r](generate_metagene_data_for_all_groups.r)).
+
+``` {r build_pre_normalized_plot, echo=FALSE, include=FALSE}
+
+load("metagene.df.RData")
+
+fw.groups <- c("FW All")
+sw.groups <- c("SW Maternal")
+
+all.groups <- c(fw.groups, sw.groups)
+
+metagene.df <- subset(metagene.df, sample %in% c("Pol II", "K4"))
+reads.df <- subset(metagene.df, tp == "MBT" & gene_group %in% all.groups)
+
+reads.df$sample <- factor(reads.df$sample, levels=c("Pol II", "K4"))
+
+g <- ggplot(reads.df, aes(x=tss_distance, y=smooth, color=as.factor(replicate))) +
+     geom_line() +
+     labs(x="Distance to TSS", y="Average enrichment over WCE", title="Pol II and K4me3 metagenes") +
+     scale_colour_discrete("Replicate") +
+     geom_vline(xintercept=0, color="gray50") +
+     theme_bw() +
+     theme(panel.grid = element_blank()) +
+     facet_grid(gene_group ~ sample, scales="free_y")
+````
+
+``` {r show_pre_normalized_plot, echo=FALSE, fig.cap="", fig.width=8, fig.height=9}
+g
+````
+
+## Normalize enrichment
+
+Next, we will select the best replicate for each factor and normalize so 1 is the maximum enrichment among the gene groups. Based on the above plot, the best replicates are:
+
+* **Pol II**: replicate 3
+* **K4**: replicate 2
+
+``` {r calc_max_enrichments, echo=FALSE, comment=NA, results="asis"}
+
+# Filter for best replicates
+
+reads.pol.mbt <- subset(reads.df, sample == "Pol II" & replicate == 3)
+reads.k4.mbt  <- subset(reads.df, sample == "K4"     & replicate == 2)
+
+reads.df <- rbind(reads.pol.mbt, reads.k4.mbt)
+
+max.enrichments <- ddply(reads.df, .(sample), summarize, max_enrichment      = max(smooth), 
+                                                         found_in_gene_group = gene_group[which.max(smooth)],
+                                                         found_at_location   = tss_distance[which.max(smooth)])
+html_table(max.enrichments)
+````
+
+``` {r normalize_enrichments_and_build_plot, echo=FALSE, fig.cap="", fig.width=8, fig.height=9}
+reads.df <- merge(reads.df, max.enrichments[, c("sample", "max_enrichment")])
+
+reads.df <- transform(reads.df, normalized_enrichment = smooth / max_enrichment)
+
+reads.df$sample <- factor(reads.df$sample, levels=c("Pol II", "K4"))
+
+g.n <- ggplot(reads.df, aes(x=tss_distance, y=normalized_enrichment, color=sample)) +
+       geom_line() +
+       labs(x="Distance to TSS", y="Normalized enrichment", title="Pol II and K4me3 metagenes (normalized)") +
+       scale_colour_discrete("Factor") +
+       geom_vline(xintercept=0, color="gray50") +
+       scale_y_continuous(breaks=c(0, 1), labels=c("Min", "Max")) +
+       theme_bw() +
+       theme(panel.grid = element_blank()) +
+       facet_wrap(~ gene_group, ncol=1)
+g.n
+````
+
+``` {r save_pdfs, echo=FALSE, include=FALSE}
+
+pdf(figure_path("pol_k4_metagenes_enrichment.pdf"), width=8, height=9, onefile=T)
+print(g)
+dev.off()
+
+pdf(figure_path("pol_k4_metagenes_normalized.pdf"), width=8, height=9, onefile=T)
+print(g.n)
+dev.off()
+
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

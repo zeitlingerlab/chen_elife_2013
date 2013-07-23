@@ -1,0 +1,123 @@
+``` {r startup, echo=FALSE, message=FALSE}
+library(GenomicRanges)
+library(rtracklayer)
+library(plyr)
+library(reshape)
+library(xtable)
+library(xlsx)
+
+knitr.figure_dir <- "step1_select_first_wave_genes_by_tss_output"
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/flybase.r")
+````
+# Step 1: Selecting first wave genes by Pol II TSS enrichment
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+After calculating Pol II enrichment in the TSS and TU regions ([pol_enrichments_flybase.r](pol_enrichments_flybase.r)) for all four pre-MBT samples, we can now define those genes that have Pol II bound in the first wave of zygotic genome activation.
+
+We will use the following criteria to define an initial list of transcripts based on Flybase annotations:
+
+* Enrichment at least 2-fold above background in the TSS region in all four replicates
+* The Pol II signal (not enrichment ratio) percentile is greater than 99 in all four replicates.
+
+``` {r pol_tss_calculations, echo=FALSE, message=FALSE}
+
+source("shared_code/tss_tu_summary.r")
+
+pol_tss <- get(load("pol_tss.flybase.RData"))
+pol_tss <- subset(pol_tss, tp == "preMBT")
+
+counts.df <- summarize_tss_tu_values(pol_tss, flybase_txs())
+
+df <- subset(counts.df, tss_count == 4)
+
+# Select transcript with maximum mean TSS/TU ratio for tss.wide
+message("Selecting 1 tx per gene")
+tss.selected_tx <- as.character(ddply(df, .(fb_gene_id), summarize, 
+                                      fb_tx_id=fb_tx_id[order(min_tss_signal_quantile, mean_tu, decreasing=TRUE)[1]])$fb_tx_id)
+
+df$highest_tss <- df$fb_tx_id %in% tss.selected_tx
+df.fw <- subset(df, min_tss_signal_quantile > 0.99 & tss_count == 4 & highest_tss == TRUE)
+
+write.table(df.fw, file=figure_path("initial_first_wave_genes_by_tss.xls"), quote=F, sep="\t", row.names=F, col.names=T)
+````
+
+This results in the following list of `r nrow(df.fw)` FW genes:
+
+``` {r initial_first_wave_table, results="asis", comment=NA, echo=FALSE}
+df.fw <- df.fw[order(df.fw$fb_symbol), ]
+html_table(df.fw[, c("fb_tx_id", "fb_gene_id", "fb_symbol", "tx_width", "mean_si")])
+````
+
+To eliminate false positives, we will look for a TBP peak near the TSS and visually examine those genes that appear to be lacking TBP. To do this, we will perform peak calling using MACS on the TBP ChIP-seq sample and assign each detected peak to the nearest TSS. First wave genes without a TBP peak within 500bp of the TSS will be flagged.
+
+``` {r assign_tbp_peaks_to_genes, echo=FALSE}
+
+peaks.tbp.1 <- import("macs/preMBT_tbp_1_peaks.bed", asRangedData=FALSE)
+peaks.tbp.2 <- import("macs/preMBT_tbp_2_peaks.bed", asRangedData=FALSE)
+peaks.tbp <- reduce(c(peaks.tbp.1, peaks.tbp.2))
+
+tss.gr <- resize(flybase_txs_granges(), 1)
+strand(tss.gr) <- "*"
+dtn <- as.data.frame(distanceToNearest(peaks.tbp, subject=tss.gr))
+
+values(peaks.tbp)$distance <- NA
+values(peaks.tbp)$nearest_gene_id <- NA
+
+values(peaks.tbp)$distance[dtn$queryHits] <- dtn$distance
+values(peaks.tbp)$nearest_gene_id[dtn$queryHits] <- values(tss.gr)$fb_gene_id[dtn$subjectHits]
+
+tbp.df <- as.data.frame(peaks.tbp)
+
+df.fw$has_tbp_peak <- df.fw$fb_gene_id %in% subset(tbp.df, distance <= 500)$nearest_gene_id
+
+df.final  <- subset(df.fw, has_tbp_peak)
+df.no_tbp <- subset(df.fw, !has_tbp_peak)
+
+write.table(df.no_tbp, file=figure_path("fw_genes_with_no_tbp.xls"), quote=F, sep="\t", row.names=F, col.names=T)
+df.no_tbp.edit <- read.xlsx(figure_path("fw_genes_with_no_tbp_edited.xlsx"), sheetIndex=1, stringsAsFactors=F, header=T)
+df.no_tbp.edit$keep <- ifelse(df.no_tbp.edit$keep == TRUE, "Yes", "No")
+df.no_tbp.edit <- df.no_tbp.edit[order(df.no_tbp.edit$keep, df.no_tbp.edit$fb_symbol, decreasing=TRUE), ]
+````
+
+The following `r nrow(df.no_tbp)` genes do not have a TBP peak:
+
+``` {r first_wave_rejects_table, results="asis", comment=NA, echo=FALSE}
+html_table(df.no_tbp.edit[, c("fb_tx_id", "fb_gene_id", "fb_symbol", "tx_width", "mean_si", "keep", "notes")])
+````
+``` {r add_no_tbp_genes_to_fw_list, echo=FALSE, include=FALSE}
+
+no_tbp.additions.txs <- subset(df.no_tbp.edit, keep == "Yes")$fb_tx_id
+
+df.final <- rbind(df.final, subset(df.fw, fb_tx_id %in% no_tbp.additions.txs))
+````
+
+# Final first wave gene list
+
+This leaves us with `r nrow(df.final)` first wave genes detected by Pol II in the TSS. 
+
+``` {r step1_first_wave_table, results="asis", comment=NA, echo=FALSE}
+df.final <- df.final[order(df.final$fb_symbol), ]
+html_table(df.final[, c("fb_tx_id", "fb_gene_id", "fb_symbol", "tx_width", "mean_si")])
+````
+
+``` {r save_first_wave_genes, echo=FALSE, message=FALSE, include=FALSE}
+fw.step1 <- df.final
+save(fw.step1, file=figure_path("fw_step1.RData"))
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE, results="markup"}
+sessionInfo()
+````
+

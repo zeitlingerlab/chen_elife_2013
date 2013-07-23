@@ -1,0 +1,17 @@
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/preMBT_pol_1.cov.RData -c /data/rdata/preMBT_wce_1.cov.RData -n preMBT_pol_1_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/preMBT_pol_2.cov.RData -c /data/rdata/preMBT_wce_1.cov.RData -n preMBT_pol_2_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/preMBT_pol_3.cov.RData -c /data/rdata/preMBT_wce_1.cov.RData -n preMBT_pol_3_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/preMBT_pol_4.cov.RData -c /data/rdata/preMBT_wce_1.cov.RData -n preMBT_pol_4_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/preMBT_tbp_1.cov.RData -c /data/rdata/preMBT_wce_1.cov.RData -n preMBT_tbp_1_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/preMBT_tbp_2.cov.RData -c /data/rdata/preMBT_wce_1.cov.RData -n preMBT_tbp_2_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/preMBT_k4_1.cov.RData -c /data/rdata/preMBT_wce_1.cov.RData -n preMBT_k4_1_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/preMBT_k4_2.cov.RData -c /data/rdata/preMBT_wce_1.cov.RData -n preMBT_k4_2_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/MBT_pol_1.cov.RData -c /data/rdata/MBT_wce_1.cov.RData -n MBT_pol_1_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/MBT_pol_2.cov.RData -c /data/rdata/MBT_wce_1.cov.RData -n MBT_pol_2_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/MBT_pol_3.cov.RData -c /data/rdata/MBT_wce_1.cov.RData -n MBT_pol_3_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/MBT_tbp_1.cov.RData -c /data/rdata/MBT_wce_1.cov.RData -n MBT_tbp_1_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/MBT_tbp_2.cov.RData -c /data/rdata/MBT_wce_1.cov.RData -n MBT_tbp_2_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/MBT_k4_1.cov.RData -c /data/rdata/MBT_wce_1.cov.RData -n MBT_k4_1_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/MBT_k4_2.cov.RData -c /data/rdata/MBT_wce_1.cov.RData -n MBT_k4_2_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/MBT_h3ac_1.cov.RData -c /data/rdata/MBT_wce_1.cov.RData -n MBT_h3ac_1_enrichment -s -l log2
+Rscript /home/ubuntu/analysis_code/shared_code/enrichment_track.r -t /data/rdata/MBT_h3ac_2.cov.RData -c /data/rdata/MBT_wce_1.cov.RData -n MBT_h3ac_2_enrichment -s -l log2

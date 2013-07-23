@@ -1,0 +1,77 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(Vennerable)
+
+knitr.figure_dir <- "figure_1s2c_compare_prembt_genes_to_known_output"
+source("shared_code/knitr_common.r")
+````
+
+# Comparison of our identified active pre-MBT genes to other known pre-MBT genes
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+``` {r build_tables, echo=FALSE, message=FALSE, results='hide'}
+
+source("shared_code/load_groups.r")
+source("shared_code/flybase.r")
+
+load("flybase/fbidmap.RData")
+wids <- read.delim('wieschaus/early_zygotic_fb_ids.txt', stringsAsFactors=F, header=F)$V1
+wids.mapped <- unique(as.character(subset(fbidmap, prev_id %in% wids)$fb_gene_id))
+
+genes <- unique(flybase_txs()[, c("fb_symbol", "fb_gene_id")])
+genes <- genes[order(genes$fb_symbol), ]
+genes$our_first_wave  <- ifelse(genes$fb_gene_id %in% fw_all$fb_gene_id, "Yes", "")
+genes$wieschaus_genes <- ifelse(genes$fb_gene_id %in% wids.mapped, "Yes", "")
+
+genes.us_only <- subset(genes, our_first_wave == "Yes" & wieschaus_genes == "")
+genes.w_only  <- subset(genes, our_first_wave == "" & wieschaus_genes == "Yes")
+genes.w_only$our_second_wave <- ifelse(genes.w_only$fb_gene_id %in% sw_all$fb_gene_id, "Yes", "")
+
+genes.common  <- subset(genes, our_first_wave == "Yes" & wieschaus_genes == "Yes")
+````
+
+## Genes in common
+
+There are `r nrow(genes.common)` genes common to both lists:
+
+``` {r common_table, echo=FALSE, message=FALSE, results="asis"}
+html_table(genes.common)
+````
+
+## Genes only in the Wieschaus list
+
+There are `r nrow(genes.w_only)` genes only in the Wieschaus list:
+
+``` {r w_only_table, echo=FALSE, message=FALSE, results="asis"}
+html_table(genes.w_only)
+````
+
+## Genes only in our list
+
+There are `r nrow(genes.us_only)` genes only in our first wave list:
+
+``` {r us_only_table, echo=FALSE, message=FALSE, results="asis"}
+html_table(genes.us_only)
+````
+
+## Venn diagram of active pre-MBT genes and Wieschaus early zygotic genes
+
+``` {r show_venn, echo=FALSE, fig.cap="", fig.width=7, fig.height=7}
+v <- Venn(list("pre-MBT active"=as.character(c(fw_groups$paused_later$fb_gene_id, fw_groups$never_paused$fb_gene_id)),
+               "Wieschaus early zygotic"=as.character(wids.mapped)))
+plot(v)
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````
+

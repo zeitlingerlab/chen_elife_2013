@@ -1,0 +1,72 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+
+knitr.figure_dir <- "step5_classifying_first_wave_genes_output"
+
+source("shared_code/knitr_common.r")
+source("shared_code/load_groups.r")
+source("shared_code/flybase.r")
+
+````
+
+# Step 5: Classifying first wave genes
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+We classify the first wave genes into 3 groups:
+
+ * **Paused**: those with a mean Pol II TU enrichment of less than 0 (log2)
+ * **Paused later**: those not paused during pre-MBT but having Pol II TSS enrichment in the top 20% in 6-8h sorted muscle cells
+ * **Never paused**: all the remaining genes
+
+``` {r fw_count_table, echo=FALSE, comment=NA, results='asis'}
+fw_table <- data.frame(stringsAsFactors=F, group_name=names(fw_groups), gene_count=sapply(fw_groups, nrow))
+html_table(fw_table)
+````
+
+## Paused
+
+``` {r fw_paused_table, echo=FALSE, comment=NA, results='asis'}
+html_table(fw_groups$paused)
+````
+
+## Paused later
+
+``` {r fw_paused_later_table, echo=FALSE, comment=NA, results='asis'}
+html_table(fw_groups$paused_later)
+````
+
+## Never paused
+
+``` {r fw_never_paused_table, echo=FALSE, comment=NA, results='asis'}
+html_table(fw_groups$never_paused)
+````
+
+``` {r output_spreadsheet, echo=FALSE, include=FALSE}
+add_name_to_group <- function(group_name, groups) {
+  df <- groups[[group_name]]
+  df$classification <- group_name
+  df
+}
+
+fw.dfs <- lapply(names(fw_groups), function(x) { add_name_to_group(x, fw_groups)})
+fw.dfs <- do.call(rbind, fw.dfs)
+fw.dfs <- fw.dfs[order(fw.dfs$classification, fw.dfs$fb_symbol), ]
+write.table(fw.dfs, file=figure_path("first_wave_genes_classified.xls"), quote=F, sep="\t", row.names=F, col.names=T)
+
+all.txs <- flybase_with_custom_txs()
+fw.txs <- merge(all.txs, fw.dfs[, c("fb_tx_id", "classification")])
+write.table(fw.txs, file=figure_path("first_wave_genes_classified_with_coordinates.xls"), quote=F, sep="\t", row.names=F, col.names=T)
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

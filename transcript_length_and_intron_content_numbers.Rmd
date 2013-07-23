@@ -1,0 +1,138 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(GenomicRanges)
+library(data.table)
+
+knitr.figure_dir <- "transcript_length_and_intron_content_numbers_output"
+
+source("shared_code/knitr_common.r")
+````
+
+# Transcript length and intron content
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Median transcript length
+
+The following table shows the median transcript length for our first and second wave gene groups.
+
+``` {r median_tx_length_table, echo=FALSE, results='asis'}
+
+source("shared_code/flybase.r")
+source("shared_code/load_groups.r")
+
+txs <- flybase_with_custom_txs()
+txs <- transform(txs, width = end - start + 1)
+txs <- transform(txs, tss = ifelse(strand == 1, start, end))
+
+tx.groups <- list("All pre-MBT"            = fw_all$fb_tx_id,
+                  "MBT maternal"      = sw_groups$maternal$fb_tx_id,
+                  "MBT zygotic (all)" = c(sw_groups$dev_high$fb_tx_id, sw_groups$dev_low$fb_tx_id),
+                  "MBT zygotic paused"= sw_groups$dev_low$fb_tx_id,
+                  "MBT zygotic active"= sw_groups$dev_high$fb_tx_id)
+
+median_tx_for_group <- function(all.txs, tx.ids, group_name) {
+  data.frame(stringsAsFactors=F, gene_group=group_name, median_width=pn(median(subset(all.txs, fb_tx_id %in% tx.ids)$width)))
+}
+
+median.df <- lapply(names(tx.groups), function(g) { median_tx_for_group(txs, tx.groups[[g]], g) })
+median.df <- do.call(rbind, median.df)
+
+fw_widths <- subset(txs, fb_tx_id %in% fw_all$fb_tx_id)$width
+sw_dev_widths <- subset(txs, fb_tx_id %in% c(sw_groups$dev_high$fb_tx_id, sw_groups$dev_low$fb_tx_id))$width
+
+tx_length_pvalue <- wilcox.test(fw_widths, sw_dev_widths, paired=FALSE)$p.value
+
+html_table(median.df)
+````
+
+P-value (Wilcoxon / Mann-Whitney test) for pre-MBT vs MBT zygotic genes: `r I(tx_length_pvalue)`
+
+## Shortest transcript usage
+
+``` {r shortest_tx_table, echo=FALSE, message=FALSE, results="asis"}
+
+shortest_tx_stats <- function(all.genes, label, txs) {
+  message(label, ": ", pn(length(txs)), " genes")
+  txs.df <- subset(all.genes, fb_tx_id %in% txs)
+  gene_ids <- txs.df$fb_gene_id
+  all_txs <- data.table(subset(all.genes, fb_gene_id %in% gene_ids))
+  tx_counts <- as.data.frame(all_txs[, list(tx_count=length(unique(tss))), by=fb_gene_id])
+  
+  multiple_tx <- subset(tx_counts, tx_count > 1)
+  message(" - ", pn(nrow(multiple_tx)), " genes have more than 1 TSS")
+  
+  shortest_tx <- as.data.frame(all_txs[, list(fb_tx_id=fb_tx_id[which.min(width)]), by=fb_gene_id])
+
+  txs_with_shortest <- subset(txs.df, fb_gene_id %in% multiple_tx$fb_gene_id & fb_tx_id %in% shortest_tx$fb_tx_id)
+  message(" - of those, ", nrow(txs_with_shortest), " transcripts are the shortest")
+  df <- data.frame(stringsAsFactors=F, 
+                   gene_group=label,
+                   total_genes=pn(length(unique(gene_ids))),
+                   genes_with_multiple_tss=pn(nrow(multiple_tx)), 
+                   using_shortest_tss=pn(nrow(txs_with_shortest)))
+  df <- transform(df, as_percent = 100 * nrow(txs_with_shortest) / nrow(multiple_tx))
+                  #percent_with_one_tss_or_shortest = (nrow(txs_with_shortest) + (length(unique(gene_ids)) - nrow(multiple_tx))) / length(unique(gene_ids)) * 100)
+  df
+}
+
+fw.a <- shortest_tx_stats(txs, "pre-MBT", fw_all$fb_tx_id)
+sw.a <- shortest_tx_stats(txs, "All MBT", sw_all$fb_tx_id)
+sw.m <- shortest_tx_stats(txs, "MBT maternal", sw_groups$maternal$fb_tx_id)
+sw.d <- shortest_tx_stats(txs, "MBT zygotic (all)", c(sw_groups$dev_low$fb_tx_id, sw_groups$dev_high$fb_tx_id))
+sw.za <- shortest_tx_stats(txs, "MBT zygotic active", sw_groups$dev_high$fb_tx_id)
+sw.zp <- shortest_tx_stats(txs, "MBT zygotic paused", sw_groups$dev_low$fb_tx_id)
+
+shortest.matrix <- matrix(c(as.integer(fw.a$using_shortest_tss), 
+                            as.integer(fw.a$genes_with_multiple_tss) - as.integer(fw.a$using_shortest_tss), 
+                            as.integer(sw.d$using_shortest_tss), 
+                            as.integer(sw.d$genes_with_multiple_tss) - as.integer(sw.d$using_shortest_tss)),
+                            byrow=TRUE, nrow=2)
+
+shortest.pv <- fisher.test(shortest.matrix)$p.value
+
+html_table(rbind(fw.a, sw.a, sw.m, sw.d, sw.za, sw.zp))
+````
+
+P-Value (Fisher test) for pre-MBT vs MBT zygotic genes: `r I(shortest.pv)`
+
+## Intron content
+
+``` {r intron_table, echo=FALSE, message=FALSE, results="asis"}
+
+intron_exon_counts.df <- get(load("flybase/intron_exon_counts.df.RData"))
+
+intron_stats_for_group <- function(all.txs, tx.ids, group_name) {
+  group.txs <- subset(all.txs, fb_tx_id %in% tx.ids)
+  data.frame(stringsAsFactors=F, gene_group = group_name, 
+                                 total      = nrow(group.txs),
+                                 no_introns = length(which(group.txs$intron_sum == 0)))
+  
+}
+
+intron.df <- lapply(names(tx.groups), function(g) { intron_stats_for_group(intron_exon_counts.df, tx.groups[[g]], g) })
+intron.df <- do.call(rbind, intron.df)
+intron.df <- transform(intron.df, as_percent = 100 * no_introns / total)
+
+intron.matrix <- matrix(c(intron.df$no_introns[1], intron.df$total[1] - intron.df$no_introns[1], 
+                          intron.df$no_introns[3], intron.df$total[3] - intron.df$no_introns[3]),
+                          byrow=TRUE, nrow=2)
+
+intron.pv <- fisher.test(intron.matrix)$p.value
+
+html_table(intron.df)
+````
+
+P-Value (Fisher test) for FW vs SW developmental genes: `r I(intron.pv)`
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

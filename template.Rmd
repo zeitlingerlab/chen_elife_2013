@@ -1,0 +1,24 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+
+knitr.figure_dir <- "template_output"
+source("shared_code/knitr_common.r")
+````
+
+# Document Title
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Overview
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE, comment=NA}
+sessionInfo()
+````

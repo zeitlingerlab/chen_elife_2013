@@ -1,0 +1,40 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+
+knitr.figure_dir <- "prembt_genes_output"
+source("shared_code/knitr_common.r")
+source("shared_code/load_groups.r")
+````
+
+# pre-MBT genes
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Overview
+
+This document outputs the current pre-MBT gene groups to a text document.
+
+``` {r output_prembt_genes, include=FALSE}
+add_group_column <- function(group_name, df_list) {
+  df <- df_list[[group_name]]
+  df$group_name <- group_name
+  df
+}
+
+fw.df <- do.call(rbind, lapply(names(fw_groups), add_group_column, fw_groups))
+fw.df$mean_tu <- NULL
+fw.df <- fw.df[order(fw.df$group_name, fw.df$fb_symbol), ]
+write.table(fw.df, file=figure_path("prembt_genes.txt"), quote=F, row.names=F, col.names=T, sep="\t")
+```
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE, comment=NA}
+sessionInfo()
+````

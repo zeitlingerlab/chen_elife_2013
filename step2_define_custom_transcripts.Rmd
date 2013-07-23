@@ -1,0 +1,186 @@
+``` {r startup, echo=FALSE, message=FALSE}
+library(GenomicRanges)
+library(rtracklayer)
+library(plyr)
+library(reshape)
+library(xtable)
+library(xlsx)
+
+knitr.figure_dir <- "step2_define_custom_transcripts_output"
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/flybase.r")
+source("shared_code/rdata_common.r")
+
+df.fw <- get(load("step1_select_first_wave_genes_by_tss_output/fw_step1.RData"))
+
+````
+# Step 2: Define custom transcripts
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+After [Step 1](step1_select_first_wave_genes_by_tss.html), `r nrow(df.fw)` first wave genes were detected by Pol II in the TSS. Next we will attempt to identify additional first wave genes that have improperly annotated transcription start sites. We will perform peak calling using MACS on all four Pol II pre-MBT samples and generate a list of regions where a Pol II peak is called in at least two samples. These peaks will be assigned to the nearest gene within 5kb. Of these genes, those that have not already been called as a first wave gene will be manually examined.
+
+``` {r pol_peak_annotations, echo=FALSE, include=FALSE}
+
+read_macs <- function(file) {
+  import(file, asRangedData=FALSE)
+}
+
+get_pol_peaks <- function(minimum_samples=2) {
+  all.peaks <- NULL
+  pol_peak_files <- list.files("macs", "preMBT_pol_._peaks.bed", full.names=TRUE)
+  for(pf in pol_peak_files) {
+    peaks <- read_macs(pf)
+    if(is.null(all.peaks))
+      all.peaks <- peaks
+    else
+      all.peaks <- c(all.peaks, peaks)
+  }
+  all.peaks.cov <- coverage(all.peaks)
+  as(ranges(slice(all.peaks.cov, lower=minimum_samples)), "GRanges")
+}
+
+pol.peaks <- get_pol_peaks(2)
+
+pol.gr <- get_load(paste0(rdata_base_path(), "preMBT_pol_1.ranges.RData"))
+wce.gr <- get_load(paste0(rdata_base_path(), "preMBT_wce_1.ranges.RData"))
+
+# Unique fragments only to remove PCR/alignment artifacts 
+
+pol.cov <- coverage(unique(pol.gr))
+wce.cov <- coverage(unique(wce.gr))
+
+values(pol.peaks)$pol_total_signal <- total_signal(pol.cov)
+values(pol.peaks)$wce_total_signal <- total_signal(wce.cov)
+values(pol.peaks)$pol_signal <- regionSums(pol.peaks, pol.cov)
+values(pol.peaks)$wce_signal <- regionSums(pol.peaks, wce.cov)
+
+values(pol.peaks)$enrichment <- with(values(pol.peaks), log2((pol_signal / pol_total_signal) / (wce_signal / wce_total_signal)))
+non_finites <- which(!is.finite(values(pol.peaks)$enrichment))
+if(length(non_finites) > 0) values(pol.peaks)$enrichment[non_finites] <- 0
+
+pol.peaks <- pol.peaks[values(pol.peaks)$enrichment > 1]
+
+genes.df <- flybase_txs()[, c("fb_gene_id", "fb_tx_id", "fb_symbol", "chr", "start", "end", "strand")]
+
+tss.gr <- flybase_txs_granges()
+tss.gr <- resize(tss.gr, 1)
+strand(tss.gr) <- "*"
+
+dtn <- as.data.frame(distanceToNearest(pol.peaks, subject=tss.gr))
+
+values(pol.peaks)$distance <- NA
+values(pol.peaks)$nearest_gene_id <- NA
+
+values(pol.peaks)$distance[dtn$queryHits] <- dtn$distance
+values(pol.peaks)$nearest_tx_id   <- values(tss.gr)$fb_tx_id[dtn$subjectHits]
+values(pol.peaks)$nearest_gene_id <- values(tss.gr)$fb_gene_id[dtn$subjectHits]
+
+peaks.near <- subset(as.data.frame(pol.peaks), distance < 5000)
+
+# For each gene, select tx with shortest distance to Pol II peak
+
+nearest.tx <- ddply(peaks.near, .(nearest_gene_id), summarize, fb_tx_id=nearest_tx_id[order(distance)][1])
+
+new.fw <- subset(genes.df[, c(1:3)], fb_tx_id %in% nearest.tx$fb_tx_id & ! fb_gene_id %in% df.fw$fb_gene_id)
+new.fw <- new.fw[order(new.fw$fb_symbol), ]
+````
+
+This yields `r pn(nrow(new.fw))` gene candidates.
+
+``` {r additional_fw_gene_candidates, echo=FALSE, results='asis', comment=NA}
+write.table(new.fw, file=figure_path("additional_fw_gene_candidates.xls"), quote=F, sep="\t", row.names=F, col.names=T)
+new.fw.edit <- read.xlsx(figure_path("additional_fw_gene_candidates_edited.xlsx"), sheetIndex=1, stringsAsFactors=F, header=T)
+new.fw.edit$new_tss <- ifelse(new.fw.edit$new_tss == "yes", "Yes", "No")
+new.fw.edit <- new.fw.edit[order(new.fw.edit$new_tss, new.fw.edit$fb_symbol, decreasing=TRUE), ]
+
+#df.final <- rbind(df.final, subset(df.fw, fb_tx_id %in% new.fw.edit$fb_tx_id))
+
+html_table(new.fw.edit)
+````
+
+To properly analyze these genes, we will need to generate custom transcripts with updated coordinates. As all of these custom genes have some TBP, we will locate the TBP peak in each gene and set the transcription start site to be 19 bases downstream. 
+
+``` {r add_custom_tx, echo=FALSE, message=FALSE, results="hide"}
+
+make_custom_tx <- function(txs.df, gene_id, tbp.cov) {
+  txs.gene <- subset(txs.df, fb_gene_id == gene_id)
+  
+  txs.gr <- with(txs.gene, GRanges(ranges   = IRanges(start=start, end=end),
+                                   seqnames = chr,
+                                   strand   = ifelse(strand == 1, "+", "-")))
+  txs.gr <- reduce(txs.gr)
+  values(txs.gr)$tbp_peak <- regionWhichMaxs(txs.gr, tbp.cov)
+  if(as.character(strand(txs.gr)) == "+") {
+    tx.df <- data.frame(stringsAsFactors=F, fb_gene_id = as.character(txs.gene$fb_gene_id[1]), 
+                                            fb_symbol  = as.character(txs.gene$fb_symbol[1]),
+                                            fb_cg_id   = txs.gene$fb_cg_id[1],
+                                            fb_tx_id   = paste("Custom", as.character(txs.gene$fb_symbol[1]), sep="_"),
+                                            chr        = txs.gene$chr[1],
+                                            start      = values(txs.gr)$tbp_peak + 19,
+                                            end        = end(txs.gr), 
+                                            strand     = 1,
+                                            type       = txs.gene$type[1])
+  } else {
+    tx.df <- data.frame(stringsAsFactors=F, fb_gene_id = as.character(txs.gene$fb_gene_id[1]), 
+                                            fb_symbol  = as.character(txs.gene$fb_symbol[1]),
+                                            fb_cg_id   = txs.gene$fb_cg_id[1],
+                                            fb_tx_id   = paste("Custom", as.character(txs.gene$fb_symbol[1]), sep="_"),
+                                            chr        = txs.gene$chr[1],
+                                            start      = start(txs.gr),
+                                            end        = values(txs.gr)$tbp_peak - 19, 
+                                            strand     = -1,
+                                            type       = txs.gene$type[1])    
+  }
+  tx.df
+}
+
+all.genes <- flybase_txs()
+tbp.cov <- get_load(paste0(rdata_base_path(), "preMBT_tbp_1.cov.RData"))
+
+new.genes.fbids <- subset(new.fw.edit, new_tss == "Yes")$fb_gene_id
+
+custom.txs <- NULL
+for(gene_id in new.genes.fbids) {
+  custom.txs <- rbind(custom.txs, make_custom_tx(all.genes, gene_id, tbp.cov))
+}
+
+custom.txs <- subset(custom.txs, fb_symbol != "mir-9a")
+
+# For mir-9a (the only gene where the TSS appears to be outside the annotated gene)
+
+txs.mir9a <- subset(all.genes, fb_symbol == "mir-9a")
+txs.mir9a$start <- txs.mir9a$start - 2500
+
+custom.mir9a <- make_custom_tx(txs.mir9a, txs.mir9a$fb_gene_id[1], tbp.cov)
+
+custom.txs <- rbind(custom.txs, custom.mir9a)
+````
+
+This results in the following custom transcripts:
+
+``` {r custom_tx_table, echo=FALSE, message=FALSE, results="asis", comment=NA}
+save(custom.txs, file=figure_path("custom_txs.RData"))
+custom.gr <- with(custom.txs, GRanges(ranges   = IRanges(start=start, end=end),
+                                      seqnames = chr,
+                                      strand   = ifelse(strand == 1, "+", "-"),
+                                      name     = fb_symbol,
+                                      score    = 0))
+export(custom.gr, figure_path("custom_txs.bed"))
+html_table(custom.txs)
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE, results="markup"}
+sessionInfo()
+````
+

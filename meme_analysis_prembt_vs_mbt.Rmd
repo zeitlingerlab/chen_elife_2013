@@ -1,0 +1,72 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(GenomicRanges)
+library(BSgenome.Dmelanogaster.UCSC.dm3)
+
+knitr.figure_dir <- "meme_analysis_prembt_vs_mbt_output"
+
+source("shared_code/knitr_common.r")
+source("shared_code/flybase.r")
+source("shared_code/load_groups.r")
+````
+
+# MEME analysis of pre-MBT active and MBT active gene groups
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Gene groups
+
+We will output the promoter sequences (250bp centered at the TSS) for the following groups of genes:
+
+ * **pre-MBT** active: all pre-MBT genes except the pre-MBT paused group
+ * **MBT active**: MBT active group only
+
+``` {r gene_groups, results='asis'}
+txs <- flybase_with_custom_txs_granges()
+txs <- resize(txs, width=1,   fix="start")
+txs <- resize(txs, width=250, fix="center")
+
+prembt.txs <- c(fw_groups$paused_later$fb_tx_id, fw_groups$never_paused$fb_tx_id)
+mbt.txs    <- c(sw_groups$dev_high$fb_tx_id)
+
+group.prembt <- txs[values(txs)$fb_tx_id %in% prembt.txs]
+group.mbt    <- txs[values(txs)$fb_tx_id %in% mbt.txs]
+
+html_table(data.frame(gene_group=c("pre-MBT active", "MBT active"), size=pn(c(length(group.prembt), length(group.mbt)))))
+````
+
+These promoter sequences will be written to two FASTA files:
+
+ * meme/prembt\_active.fasta
+ * meme/mbt\_active.fasta
+
+``` {r output_fasta, include=FALSE}
+
+seq.prembt <- getSeq(Dmelanogaster, group.prembt)
+seq.mbt    <- getSeq(Dmelanogaster, group.mbt)
+
+names(seq.prembt) <- with(values(group.prembt), sprintf("%s(%s)", fb_gene_id, fb_symbol))
+names(seq.mbt)    <- with(values(group.mbt),    sprintf("%s(%s)", fb_gene_id, fb_symbol))
+
+writeXStringSet(seq.prembt, filepath="meme/prembt_active.fasta")
+writeXStringSet(seq.mbt,    filepath="meme/mbt_active.fasta")
+````
+
+``` {r meme_command, engine="bash", echo=TRUE, eval=FALSE}
+MEME=$HOME/apps/meme/bin/meme
+
+$MEME meme/prembt_active.fasta -mod zoops -dna -nmotifs 25 -revcomp -maxw 12 -maxsize 5000000 -oc meme/prembt_active
+$MEME meme/mbt_active.fasta    -mod zoops -dna -nmotifs 25 -revcomp -maxw 12 -maxsize 5000000 -oc meme/mbt_active
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

@@ -1,0 +1,137 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+library(plyr)
+library(GenomicRanges)
+
+knitr.figure_dir <- "figure_1s3_read_through_and_new_tss_examples_output"
+source("shared_code/knitr_common.r")
+source("shared_code/rdata_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/flybase.r")
+````
+
+# Figure: Examples of Pol II read-through and un-annotated TSSs
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Pol II read through
+
+``` {r pol_read_though, echo=FALSE, message=FALSE, fig.cap="", fig.width=15, fig.height=5}
+
+load_sample <- function(s) {
+  updateObject(get(load(paste(rdata_base_path(), "/", s, ".cov.RData", sep=""))))
+}
+
+# ##FIX
+tp2.pol <- load_sample("preMBT_pol_2")
+tp2.tbp <- load_sample("preMBT_tbp_1")
+
+tp3.pol <- load_sample("MBT_pol_3")
+tp3.tbp <- load_sample("MBT_tbp_2")
+
+tp4.pol <- load_sample("postMBT_pol_1")
+tp4.tbp <- load_sample("postMBT_tbp_1")
+
+ex1 <- data.frame(chr="chr3R", start=4515001,  end=4525000)
+ex2 <- data.frame(chr="chr2R", start=15550001, end=15560000)
+ex3 <- data.frame(chr="chr3L", start=16105001, end=16115000)
+ex4 <- data.frame(chr="chr3R", start=4103001,  end=4106000)
+ex5 <- data.frame(chr="chr3L", start=18737001, end=18740000)  # expand
+ex6 <- data.frame(chr="chr2L", start=4682001,  end=4690000)   # expand
+
+examples.df <- rbind(ex1, ex2, ex3, ex4, ex5, ex6)
+
+# expand 5 and 6 by 50%
+examples.df <- transform(examples.df, midpoint = (end + start) / 2,
+                                      width = end - start + 1)
+examples.df[5:6, ] <- transform(examples.df[5:6, ], start = midpoint - (width * 1.5) / 2,
+                                                    end   = midpoint + (width * 1.5) / 2)
+examples.df$midpoint <- NULL
+examples.df$width <- NULL
+
+reads_from_cov <- function(cov, chr, start, end, name, norm_target=150*10000000) {
+  reads <- as.integer(cov[[as.character(chr)]][start:end]) / total_signal(cov) * norm_target
+  data.frame(position=start:end, reads=reads, name=name)
+}
+
+txs <- flybase_txs_granges()
+txs <- unlist(reduce(split(txs, values(txs)$fb_gene_id)), use.names=TRUE)
+values(txs)$fb_gene_id <- names(txs)
+names(txs) <- NULL
+
+find_genes_in_window <- function(chr, window_start, window_end) {
+  txs.df <- merge(as.data.frame(txs), flybase_txs()[, c("fb_symbol", "fb_gene_id")])
+  txs.df <- subset(txs.df, seqnames == chr & start >= window_start & end <= window_end)
+  txs.df
+}
+
+saved_figures <- list()
+
+for(i in 1:nrow(examples.df)) {
+  chr <- as.character(examples.df$chr[i])
+  start_pos <- examples.df$start[i]
+  end_pos   <- examples.df$end[i]
+  
+  reads.pre_mbt <- rbind(reads_from_cov(tp2.pol, chr, start_pos, end_pos, "Pol II"), 
+                         reads_from_cov(tp2.tbp, chr, start_pos, end_pos, "TBP"))
+
+  reads.mbt <- rbind(reads_from_cov(tp3.pol, chr, start_pos, end_pos, "Pol II"), 
+                     reads_from_cov(tp3.tbp, chr, start_pos, end_pos, "TBP"))
+
+  reads.post_mbt <- rbind(reads_from_cov(tp4.pol, chr, start_pos, end_pos, "Pol II"), 
+                          reads_from_cov(tp4.tbp, chr, start_pos, end_pos, "TBP"))
+  
+  reads.pre_mbt$tp  <- "pre-MBT"
+  reads.mbt$tp      <- "MBT"
+  reads.post_mbt$tp <- "post-MBT"
+  
+  reads <- rbind(reads.pre_mbt, reads.mbt, reads.post_mbt)
+  
+  genes.df <- find_genes_in_window(chr, start_pos, end_pos)
+  
+  max.reads <- max(reads$reads)
+  block.height <- max.reads * 0.10
+  
+  genes.df$y_start <- -1 * 0.5 * block.height
+  genes.df$y_stop  <- genes.df$y_start - block.height
+  
+  genes.df <- transform(genes.df, text_pos_x = (start + end) / 2,
+                                  text_pos_y = (y_start + y_stop) / 2)
+  
+  reads$tp <- factor(reads$tp, levels=c("pre-MBT", "MBT", "post-MBT"))
+  
+  g <- ggplot(reads, aes(x=position, y=reads, fill=name)) +
+       geom_area(position="identity", alpha=0.75) +
+       geom_rect(data=genes.df, inherit.aes=FALSE, color="black", fill="gray50", alpha=0.5, aes(xmin=start, xmax=end, ymin=y_start, ymax=y_stop)) +
+       geom_text(data=genes.df, inherit.aes=FALSE, color="white", aes(x=text_pos_x, y=text_pos_y, label=fb_symbol)) +
+       scale_fill_manual("Factor", values=c("Pol II"="#1E1E78", "TBP"="#F8426D")) +
+       facet_wrap(~ tp, ncol=3) +
+       theme_bw() +
+       labs(x=sprintf("Position on %s", chr), y="Normalized reads") +
+       theme(panel.grid=element_blank())
+  saved_figures[[i]] <- g
+  print(g)
+}
+
+````
+
+``` {r print_to_pdf, echo=FALSE, include=FALSE}
+pdf(figure_path("examples.pdf"), width=21, height=5, onefile=T)
+nothing <- lapply(saved_figures, print)
+dev.off()
+````
+
+## Un-annotated TSSs
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

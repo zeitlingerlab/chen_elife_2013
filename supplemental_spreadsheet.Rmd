@@ -1,0 +1,164 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(xlsx)
+
+knitr.figure_dir <- "supplemental_spreadsheet_output"
+
+source("shared_code/knitr_common.r")
+````
+
+# Supplemental spreadsheet
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Data to include
+
+The supplemental spreadsheet for the paper will include the following:
+
+* All FlyBase transcripts (including custom) used in analysis
+* Pol II TSS and TU enrichment values for 4 pre-MBT replicates and 3 MBT replicates
+* First wave transcripts with classification
+* Second wave transcripts with classification
+* Presence of TATA motif in promoter (0 mismatch)
+* De novo detection of TATA motif in promoter (via MEME)
+* Genes rejected from pre\-MBT list due to read-through
+* Promoter motif annotations for each transcript (0 mismatch)
+
+``` {r build_dataframe, echo=FALSE, include=FALSE}
+
+source("shared_code/flybase.r")
+
+txs <- flybase_with_custom_txs()
+
+source("shared_code/load_groups.r")
+
+# Add first and second wave genes
+
+names(fw_groups) <- c("paused", "dual", "not-paused")
+
+fw.map <- do.call(rbind, lapply(names(fw_groups), 
+                         function(group_name) { 
+                           data.frame(stringsAsFactors=F, fb_tx_id=fw_groups[[group_name]]$fb_tx_id, group_name=group_name) 
+                         }))
+
+names(sw_groups) <- c("maternal", "zygotic active", "zygotic poised")
+
+sw.map <- do.call(rbind, lapply(names(sw_groups), 
+                         function(group_name) { 
+                           data.frame(stringsAsFactors=F, fb_tx_id=sw_groups[[group_name]]$fb_tx_id, group_name=group_name) 
+                         }))
+
+#txs <- transform(txs, preMBT_gene = ifelse(fb_tx_id %in% fw_all$fb_tx_id, "Yes", ""))
+txs$preMBT_group <- fw.map$group_name[match(txs$fb_tx_id, fw.map$fb_tx_id)]
+txs$preMBT_group[is.na(txs$preMBT_group)] <- ""
+
+#txs <- transform(txs, MBT_gene = ifelse(fb_tx_id %in% sw_all$fb_tx_id, "Yes", ""))
+txs$MBT_group <- sw.map$group_name[match(txs$fb_tx_id, sw.map$fb_tx_id)]
+txs$MBT_group[is.na(txs$MBT_group)] <- ""
+
+# Add TATA motif 
+
+pe <- get(load("promoter_elements/pe.0mm.RData"))[, c("fb_tx_id", "TATA")]
+names(pe)[2] <- "Has_TATA_motif"
+pe$Has_TATA_motif <- ifelse(pe$Has_TATA_motif, "Yes", "")
+
+txs <- merge(txs, pe)
+
+# Add de novo TATA
+
+source("shared_code/meme_xml.r")
+meme <- parse_meme_xml("meme/prembt_active/meme.xml")
+meme_tata_fb_genes <- gsub("^(FBgn.......)\\(.*\\)$", "\\1", unique(motif_sites(meme, "motif_2")$name))
+meme_tata_fb_txs <- as.character(subset(fw_all, fb_gene_id %in% meme_tata_fb_genes)$fb_tx_id)
+
+de_novo_scanned_txs <- c(fw_groups[["not-paused"]]$fb_tx_id, fw_groups[["dual"]]$fb_tx_id)
+
+txs$de_novo_TATA_motif_found <- ifelse(txs$fb_tx_id %in% meme_tata_fb_txs, "Yes", "No")
+txs$de_novo_TATA_motif_found[which(!txs$fb_tx_id %in% de_novo_scanned_txs)] <- "Not tested"
+
+# Add rejected pre-MBT genes
+
+step1.df <- read.xlsx("step1_select_first_wave_genes_by_tss_output/fw_genes_with_no_tbp_edited.xlsx", sheetIndex=1, stringsAsFactors=F)
+
+rejected.txs <- subset(step1.df, keep == FALSE)$fb_tx_id
+
+txs <- transform(txs, rejected_preMBT_gene = ifelse(fb_tx_id %in% rejected.txs, "Yes", " "))
+
+txs <- txs[order(txs$fb_symbol, txs$start), ]
+
+# Add Pol II TSS
+
+pol_tss <- rbind(get(load("pol_tss.flybase.RData")), get(load("step3_check_custom_transcripts_output/pol_tss.custom.RData")))
+
+# Set non-finite values to NA
+
+infs <- which(!is.finite(pol_tss$tss.ratio))
+pol_tss$tss.ratio[infs] <- NA
+
+infs <- which(!is.finite(pol_tss$tu.ratio))
+pol_tss$tu.ratio[infs] <- NA
+
+tss.prembt <- reshape(subset(pol_tss, tp == "preMBT")[, c("fb_tx_id", "tss.ratio", "replicate")],
+                      idvar="fb_tx_id", v.names="tss.ratio", timevar="replicate", direction="wide")
+tss.prembt <- tss.prembt[, c(1, order(names(tss.prembt)[-1]) + 1)]
+names(tss.prembt)[2:5] <- paste0("preMBT_PolII_TSS_enrichment_r", 1:4)
+
+tss.mbt <- reshape(subset(pol_tss, tp == "MBT")[, c("fb_tx_id", "tss.ratio", "replicate")],
+                      idvar="fb_tx_id", v.names="tss.ratio", timevar="replicate", direction="wide")
+tss.mbt <- tss.mbt[, c(1, order(names(tss.mbt)[-1]) + 1)]
+names(tss.mbt)[2:4] <- paste0("MBT_PolII_TSS_enrichment_r", 1:3)
+
+tu.prembt <- reshape(subset(pol_tss, tp == "preMBT")[, c("fb_tx_id", "tu.ratio", "replicate")],
+                      idvar="fb_tx_id", v.names="tu.ratio", timevar="replicate", direction="wide")
+tu.prembt <- tu.prembt[, c(1, order(names(tu.prembt)[-1]) + 1)]
+names(tu.prembt)[2:5] <- paste0("preMBT_PolII_TU_enrichment_r", 1:4)
+
+txs <- merge(txs, tss.prembt)
+txs <- merge(txs, tu.prembt)
+txs <- merge(txs, tss.mbt)
+
+# Add PHASTCON scores (Axel)
+scores <- read.delim("phastcon_scores/phastcon_scores.txt", stringsAsFactors=FALSE, header=TRUE)
+supp.df <- txs
+supp.df <- merge(supp.df, scores, all.x=TRUE)
+
+# Add promoter elements
+
+pe.0mm <- get(load("promoter_elements/pe.0mm.RData"))
+pe.0mm[, -1] <- as.integer(as.matrix(pe.0mm[, -1]))
+
+supp.df <- merge(supp.df, pe.0mm)
+````
+
+``` {r show_dataframe, echo=FALSE, comment=NA, results="asis"}
+html_table(rbind(head(supp.df, 10), tail(supp.df, 10)))
+````
+
+``` {r write_to_excel_and_rdata, echo=FALSE, include=FALSE}
+write.table(supp.df,
+            file=figure_path("supplemental_spreadsheet.xls"),
+            quote=F, sep="\t", col.names=TRUE, row.names=FALSE, na="")
+
+
+#fb_map <- flybase_with_custom_txs()[, c("fb_gene_id", "fb_symbol", "fb_tx_id")]
+
+#write.table(merge(fb_map, pe.0mm),
+#            file=figure_path("supplemental_spreadsheet_promoters.xls"), 
+#            quote=F, sep="\t", col.names=TRUE, row.names=FALSE, na="")
+
+save(supp.df, file=figure_path("supplemental_spreadsheet.RData"))
+````
+
+The full spreadsheet can be viewed [here](supplemental_spreadsheet_output/supplemental_spreadsheet.xlsx).
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

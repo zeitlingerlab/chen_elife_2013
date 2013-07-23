@@ -1,0 +1,77 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+
+knitr.figure_dir <- "figure_5b_meme_results_output"
+
+source("shared_code/knitr_common.r")
+source("shared_code/meme_xml.r")
+
+meme.prembt <- parse_meme_xml("meme/prembt_active/meme.xml")
+meme.mbt    <- parse_meme_xml("meme/mbt_active/meme.xml")
+````
+
+# Figure: MEME results
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## pre-MBT active genes
+
+`r pn(meme.prembt$sequence_count)` genes were analyzed with MEME as part of the pre-MBT active set. 
+
+``` {r prembt_meme_figures, warning=FALSE, message=FALSE, fig.cap=""}
+
+
+seq_logo_and_site_histogram <- function(meme, motif) {
+  seqLogo(meme$motifs[[motif]])
+  g <- ggplot(meme$motif_sites[[motif]], aes(x=position-125)) + 
+       geom_histogram() +
+       #geom_line(stat="density") +
+       xlim(-125, 125) +
+       theme_bw() +
+       labs(x="Position relative to TSS", title=sprintf("%s\n%s sites", motif, meme$motif_info[[motif]]$sites))
+  print(g)
+}
+
+
+for(motif in names(meme.prembt$motifs)) {
+  seq_logo_and_site_histogram(meme.prembt, motif)
+}
+
+````
+
+## MBT active genes
+
+`r pn(meme.mbt$sequence_count)` genes were analyzed with MEME as part of the MBT active set. 
+
+``` {r mbt_meme_figures, warning=FALSE, message=FALSE, fig.cap=""}
+
+seq_logo_and_site_histogram <- function(meme, motif) {
+  seqLogo(meme$motifs[[motif]])
+  g <- ggplot(meme$motif_sites[[motif]], aes(x=position-125)) + 
+       geom_histogram() +
+       #geom_line(stat="density") +
+       xlim(-125, 125) +
+       theme_bw() +
+       labs(x="Position relative to TSS", title=sprintf("%s\n%s sites", motif, meme$motif_info[[motif]]$sites))
+  print(g)
+}
+
+
+for(motif in names(meme.mbt$motifs)) {
+  seq_logo_and_site_histogram(meme.mbt, motif)
+}
+
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

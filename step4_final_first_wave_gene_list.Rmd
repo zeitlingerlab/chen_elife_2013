@@ -1,0 +1,40 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+
+knitr.figure_dir <- "step4_final_first_wave_gene_list_output"
+source("shared_code/knitr_common.r")
+
+# First wave genes with proper annotations
+fw.fb     <- get(load("step1_select_first_wave_genes_by_tss_output/fw_step1.RData"))
+
+# First wave genes from custom annotations
+fw.custom <- get(load("step3_check_custom_transcripts_output/fw_custom.RData"))
+
+cols <- c("fb_tx_id", "fb_gene_id", "fb_symbol", "mean_tu")
+fw.df <- rbind(fw.fb[, cols], fw.custom[, cols])
+fw.df <- fw.df[order(tolower(fw.df$fb_symbol)), ]
+save(fw.df, file=figure_path("fw.df.RData"))
+write.table(fw.df, file=figure_path("first_wave_genes.xls"), quote=F, sep="\t", row.names=F, col.names=T)
+````
+
+# Step 4: Final first wave gene list
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+After including our custom transcripts, the following are our `r pn(nrow(fw.df))` first wave genes:
+
+``` {r first_wave_genes, echo=FALSE, comment=NA, results='asis'}
+html_table(fw.df)
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

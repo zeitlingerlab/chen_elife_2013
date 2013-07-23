@@ -1,0 +1,64 @@
+``` {r startup, echo=FALSE, message=FALSE}
+library(GenomicRanges)
+library(rtracklayer)
+library(plyr)
+library(reshape)
+library(xtable)
+library(xlsx)
+
+knitr.figure_dir <- "step3_check_custom_transcripts_output"
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/flybase.r")
+
+custom.txs <- get(load("step2_define_custom_transcripts_output/custom_txs.RData"))
+````
+
+# Step 3: Check custom transcripts
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+In [Step 2](step2_define_custom_transcripts.html) we defined `r pn(nrow(custom.txs))` custom transcripts due to misannotations in Flybase. We now need to calculate Pol II TSS and TU enrichments for these transcripts to see if they meet our criteria for first wave genes.
+
+``` {r calc_pol_enrichments_for_custom_txs, echo=FALSE, include=FALSE}
+source("shared_code/pol_enrichments_common.r")
+pol_custom <-  calc_pol_enrichments_for_txs(custom.txs)
+save(pol_custom, file=figure_path("pol_tss.custom.RData"))
+````
+
+Next we will check which of the custom transcripts have Pol II TSS enrichment 2x above background in all four replicates.
+
+``` {r summarize_custom_txs, echo=FALSE, include=FALSE}
+source("shared_code/tss_tu_summary.r")
+
+pol_custom <- subset(pol_custom, tp == "preMBT")
+pol_tss <- subset(get(load("pol_tss.flybase.RData")), tp == "preMBT")
+
+pol_combined <- rbind(pol_tss, pol_custom)
+
+fb_plus_custom.txs <- rbind(flybase_txs(), custom.txs)
+
+custom.df <- summarize_tss_tu_values(pol_combined, fb_plus_custom.txs)
+custom.df <- subset(custom.df, fb_tx_id %in% custom.txs$fb_tx_id)
+
+fw_custom <- custom.df
+save(fw_custom, file=figure_path("fw_custom.RData"))
+````
+
+``` {r results_table, echo=FALSE, comment=NA, results="asis"}
+html_table(custom.df)
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE, results="markup"}
+sessionInfo()
+````
+

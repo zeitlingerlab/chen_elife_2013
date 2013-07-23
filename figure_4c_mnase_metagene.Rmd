@@ -1,0 +1,71 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+
+source("shared_code/metagene_graphs.R")
+
+knitr.figure_dir <- "figure_4c_mnase_metagene_output"
+source("shared_code/knitr_common.r")
+source("shared_code/flybase.r")
+source("shared_code/load_groups.r")
+source("shared_code/rdata_common.r")
+````
+
+# Figure: MNase metagene plot at MBT
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+We'd like to show the MNase profile of the following gene groups at the MBT stage:
+
+* All first wave
+* Second wave maternal
+
+``` {r get_metagene_reads_and_build_plot, echo=FALSE, include=FALSE}
+
+
+mnase.cov <- get_load(paste0(rdata_base_path(), "/MBT_mnase_1.cov.RData"))
+
+all.txs <- flybase_with_custom_txs()
+names(all.txs)[which(names(all.txs) == "end")] <- "stop"
+
+txs.fw  <- subset(all.txs, fb_tx_id %in% fw_all$fb_tx_id)
+txs.swm <- subset(all.txs, fb_tx_id %in% sw_groups$maternal$fb_tx_id)
+
+reads.fw  <- get_metagene_reads(mnase.cov, txs.fw,  before_tss=250, after_tss=1000, normalization_target=10000000*150, smooth=51, sample="All first wave")
+reads.swm <- get_metagene_reads(mnase.cov, txs.swm, before_tss=250, after_tss=1000, normalization_target=10000000*150, smooth=51, sample="Second wave maternal")
+
+reads.df <- rbind(reads.fw, reads.swm)
+
+reads.df$sample <- factor(reads.df$sample, levels=c("All first wave", "Second wave maternal"))
+
+g <- ggplot(reads.df, aes(x=tss_distance, y=smooth)) +
+     geom_line() +
+     labs(x="Distance to TSS", y="MNase reads", title="MNase metagene profile") +
+     geom_vline(xintercept=0, color="gray50") +
+     theme_bw() +
+     theme(panel.grid = element_blank()) +
+     facet_wrap(~ sample, ncol=1)
+````
+
+``` {r show_plot, echo=FALSE, fig.cap="", fig.width=6, fig.height=9}
+g
+````
+
+``` {r save_pdfs, echo=FALSE, include=FALSE}
+
+pdf(figure_path("mbt_mnase_metagenes.pdf"), width=6, height=9, onefile=T)
+print(g)
+dev.off()
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

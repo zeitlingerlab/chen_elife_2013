@@ -1,0 +1,138 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+library(reshape2)
+
+knitr.figure_dir <- "figure_1s2b_replicate_reproducibility_stats_output"
+
+source("shared_code/knitr_common.r")
+````
+
+# Replicate reproducibility statistics
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Overview
+
+We used the following number of biological replicates for this study:
+
+  * pre-MBT Pol II: 3
+  * pre-MBT TBP: 2
+  * MBT Pol II: 3
+  * MBT TBP: 2
+
+To assess the reproducibility of our ChIP-seq experiments, we will calculate Pearson correlation matrixes for the Pol II and TBP signal in the transcription start sites of all annotated transcripts for all combinations of biological replicates. As a control, we will include the corresponding whole-cell extract sample.
+
+``` {r load_data, echo=FALSE, include=FALSE}
+pol.df <- rbind(get(load("step3_check_custom_transcripts_output/pol_tss.custom.RData")),
+                get(load("pol_tss.flybase.RData")))
+tbp.df <- get(load("tbp_tss.custom.RData"))
+```
+
+``` {r helper_functions, echo=FALSE, include=FALSE}
+
+
+
+cor_plot <- function(cor.df, title) {
+  plot.df <- cor.df
+  plot.df$sample <- rownames(plot.df)
+  plot.df <- melt(plot.df)
+  plot.df$variable <- factor(plot.df$variable, levels=rev(sort(unique(plot.df$variable))))
+  g <- ggplot(plot.df, aes(x=sample, y=variable, fill=value)) +
+       geom_tile() +
+       geom_text(aes(label=round(value, 2)), color="black") +
+       theme_bw() +
+       scale_fill_continuous("Pearson correlation", high="red", low="white", limits=c(0, 1)) +
+       theme(panel.grid=element_blank(),
+             axis.text=element_text(size=14)) +
+       labs(x="", y="", title=title)
+  g
+}
+
+calc_cor <- function(data.df, timepoint) {
+  ip.df  <- subset(data.df, tp == timepoint)[, c("fb_tx_id", "tss.ip.signal", "replicate")]
+  wce.df <- unique(subset(data.df, tp == timepoint)[, c("fb_tx_id", "tss.wce.signal")])
+  wce.df$replicate <- "WCE"
+  names(wce.df)[2] <- "tss.ip.signal"
+  values.df <- rbind(ip.df, wce.df)
+  values.df <- values.df[order(values.df$replicate), ]
+  values.wide <- reshape(values.df, idvar="fb_tx_id", v.names="tss.ip.signal", timevar="replicate", direction="wide")
+  values.m <- as.matrix(values.wide[, -1])
+  cor.df <- as.data.frame(cor(values.m, method="pearson"))
+  names(cor.df) <- gsub("tss.ip.signal.", "", names(cor.df))
+  rownames(cor.df) <- gsub("tss.ip.signal.", "", rownames(cor.df))
+  cor.df
+}
+
+```
+
+## pre-MBT samples
+
+### Pol II (4 replicates)
+
+``` {r prembt_pol_matrix, echo=FALSE, message=FALSE, fig.cap="", fig.width=7, fig.height=5}
+prembt_pol.cor  <- calc_cor(pol.df, "preMBT")
+prembt_pol.plot <- cor_plot(prembt_pol.cor, "pre-MBT Pol II replicates")
+prembt_pol.plot
+```
+
+``` {r prembt_pol_table, echo=FALSE, results="asis"}
+html_table(prembt_pol.cor, row.names=TRUE)
+```
+
+### TBP (2 replicates)
+
+``` {r prembt_tbp_matrix, echo=FALSE, message=FALSE, fig.cap="", fig.width=7, fig.height=5}
+prembt_tbp.cor <- calc_cor(tbp.df, "preMBT")
+prembt_tbp.plot <- cor_plot(prembt_tbp.cor, "pre-MBT TBP replicates")
+prembt_tbp.plot
+```
+
+``` {r prembt_tbp_table, echo=FALSE, results="asis"}
+html_table(prembt_tbp.cor, row.names=TRUE)
+```
+
+## MBT samples
+
+### Pol II (3 replicates)
+
+``` {r mbt_pol_matrix, echo=FALSE, message=FALSE, fig.cap="", fig.width=7, fig.height=5}
+mbt_pol.cor  <- calc_cor(pol.df, "MBT")
+mbt_pol.plot <- cor_plot(mbt_pol.cor, "MBT Pol II replicates")
+mbt_pol.plot
+```
+
+``` {r mbt_pol_table, echo=FALSE, results="asis"}
+html_table(mbt_pol.cor, row.names=TRUE)
+```
+
+### TBP (2 replicates)
+
+``` {r mbt_tbp_matrix, echo=FALSE, message=FALSE, fig.cap="", fig.width=7, fig.height=5}
+mbt_tbp.cor  <- calc_cor(tbp.df, "MBT")
+mbt_tbp.plot <- cor_plot(mbt_tbp.cor, "MBT TBP replicates")
+mbt_tbp.plot
+```
+
+``` {r mbt_tbp_table, echo=FALSE, results="asis"}
+html_table(mbt_tbp.cor, row.names=TRUE)
+```
+
+``` {r save_pdf, include=FALSE}
+pdf(figure_path("pol_samples_heatmap.pdf"), width=7, height=5)
+print(prembt_pol.plot)
+print(mbt_pol.plot)
+dev.off()
+```
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, comment=NA, echo=FALSE}
+sessionInfo()
+````

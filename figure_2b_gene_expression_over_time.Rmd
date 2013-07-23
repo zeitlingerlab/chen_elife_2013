@@ -1,0 +1,225 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+library(plyr)
+
+knitr.figure_dir <- "figure_2b_gene_expression_over_time_output"
+source("shared_code/knitr_common.r")
+````
+
+# Figure: Gene expression over time
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## First and second wave groups
+
+We'd like to plot the expression over time for these gene groups:
+
+* First wave non-paused
+* First wave paused later
+* First wave paused
+* Second wave developmental active
+* Second wave developmental poised
+
+To eliminate as many maternally deposited genes as possible, we will exclude genes that have high expression in nuclear cycle 10 (RPKM > 16) as well as those genes with maternal expression at least two-fold above zygotic expression (Eisen F10 sample). We will then plot the median RPKM of each group over time.
+
+``` {r generate_plot, echo=FALSE, include=FALSE}
+
+source("shared_code/load_groups.r")
+
+rna.tc <- get(load("rnaseq/eisen.rnaseq.RData"))
+
+rpkms <- get(load("rnaseq/we.rnaseq.RData"))
+rpkms$sample <- gsub("^we", "", rpkms$sample)
+
+tps <- c(sort(unique(as.character(rna.tc$sample))), sort(unique(as.character(rpkms$sample))))
+
+rna.tc <- rbind(rna.tc, rpkms)
+
+load("rnaseq/rna.matpat.RData")
+
+mat.genes <- as.character(subset(rna.matpat, sample == "F10" & (RPKM.w1 > 2 * RPKM.cas))$fb_gene_id)
+
+high.10 <- as.character(subset(rna.tc, sample == "10" & RPKM > 2^4)$fb_gene_id)
+
+rna.tc <- subset(rna.tc, ! fb_gene_id %in% mat.genes)
+rna.tc <- subset(rna.tc, ! fb_gene_id %in% high.10)
+
+#rna.tc$RPKM <- pmax(rna.tc$RPKM, 1)
+
+rna.np      <- subset(rna.tc, fb_gene_id %in% fw_groups$never_paused$fb_gene_id)
+rna.p       <- subset(rna.tc, fb_gene_id %in% fw_groups$paused$fb_gene_id)
+rna.pl      <- subset(rna.tc, fb_gene_id %in% fw_groups$paused_later$fb_gene_id)
+rna.sw_high <- subset(rna.tc, fb_gene_id %in% sw_groups$dev_high$fb_gene_id)
+rna.sw_low  <- subset(rna.tc, fb_gene_id %in% sw_groups$dev_low$fb_gene_id)
+
+rna.np$gene_group <- "First wave (never paused)"
+rna.p$gene_group  <- "First wave (paused)"
+rna.pl$gene_group <- "First wave (paused later)"
+rna.sw_high$gene_group <- "Second wave (dev high)"
+rna.sw_low$gene_group <- "Second wave (dev low)"
+
+rna.all_groups <- rbind(rna.np, rna.p, rna.pl, rna.sw_high, rna.sw_low)
+
+rna.all_groups$fb_gene_id <- as.character(rna.all_groups$fb_gene_id)
+
+rna.all_groups$sample <- factor(rna.all_groups$sample, levels=tps)
+
+df <- ddply(rna.all_groups, .(sample, gene_group), summarize, median=median(RPKM, na.rm=T), mean=mean(RPKM, na.rm=T))
+df$sample <- factor(df$sample, levels=tps)
+
+g <- ggplot(df, aes(x=as.integer(sample), y=log2(median+1), color=gene_group)) + 
+     geom_line() +
+     scale_x_continuous(breaks=1:length(tps), labels=tps) +
+     scale_colour_discrete("") +
+     theme_bw() +
+     theme(panel.grid=element_blank()) +
+     labs(x="Nuclear cycle / time point", y="Median RPKM+1 (log2)", title="Gene expression profiles over time")
+````
+
+``` {r show_counts_table, echo=FALSE, results="asis"}
+counts.df <- ddply(rna.all_groups, .(gene_group), summarize, gene_count=pn(length(unique(fb_gene_id))))
+html_table(counts.df)
+````
+
+``` {r show_plot, echo=FALSE, fig.cap="", fig.width=10, fig.height=6}
+g
+````
+
+``` {r save_pdf, echo=FALSE, include=FALSE}
+pdf(figure_path("rnaseq_expression_over_time.pdf"), width=10, height=6, onefile=T)
+print(g)
+dev.off()
+````
+
+## First and second wave genes by intron content
+
+Next we'll examine whether the first wave genes with introns behave differently than those without introns. As a control, we will divide the second wave developmental (active and poised) genes the same way.
+
+``` {r build_intron_plot, echo=FALSE, include=FALSE}
+
+intron.df <- get(load("flybase/intron_exon_counts.df.RData"))
+
+split_by_introns <- function(rna.df, intron.df, tx.ids) {
+  ids.with_introns <- as.character(subset(intron.df, fb_tx_id %in% tx.ids & intron_sum >  0)$fb_gene_id)
+  ids.no_introns   <- as.character(subset(intron.df, fb_tx_id %in% tx.ids & intron_sum == 0)$fb_gene_id)
+
+  with.introns <- subset(rna.df, fb_gene_id %in% ids.no_introns)
+  with.introns$intron_group <- "No introns"
+  
+  wo.introns <- subset(rna.df, fb_gene_id %in% ids.with_introns)
+  wo.introns$intron_group <- "Introns"
+  
+  rbind(with.introns, wo.introns)
+}
+
+intron.fw <- split_by_introns(rna.tc, intron.df, fw_all$fb_tx_id)
+intron.fw$gene_group <- "First wave"
+
+intron.sw.high <- split_by_introns(rna.tc, intron.df, sw_groups$dev_high$fb_tx_id)
+intron.sw.high$gene_group <- "Second wave (active)"
+
+intron.sw.low <- split_by_introns(rna.tc, intron.df, sw_groups$dev_low$fb_tx_id)
+intron.sw.low$gene_group <- "Second wave (poised)"
+
+intron.all <- rbind(intron.fw, intron.sw.high, intron.sw.low)
+
+df <- ddply(intron.all, .(sample, gene_group, intron_group), summarize, median=median(RPKM, na.rm=T), mean=mean(RPKM, na.rm=T))
+df$sample <- factor(df$sample, levels=tps)
+
+g <- ggplot(df, aes(x=as.integer(sample), y=log2(median+1), color=gene_group, linetype=intron_group)) + 
+     geom_line() +
+     scale_x_continuous(breaks=1:length(tps), labels=tps) +
+     scale_colour_discrete("") +
+     theme_bw() +
+     theme(panel.grid=element_blank()) +
+     labs(x="Nuclear cycle / time point", y="Median RPKM+1 (log2)", title="Gene expression profiles over time")
+````
+
+``` {r show_intron_table, echo=FALSE, results="asis"}
+counts.df <- ddply(intron.all, .(gene_group, intron_group), summarize, gene_count=pn(length(unique(fb_gene_id))))
+html_table(counts.df)
+````
+
+``` {r show_intron_plot, echo=FALSE, fig.cap="", fig.width=10, fig.height=6}
+g
+````
+
+``` {r save_intron_pdf, echo=FALSE, include=FALSE}
+pdf(figure_path("rnaseq_expression_over_time_by_introns.pdf"), width=10, height=6, onefile=T)
+print(g)
+dev.off()
+````
+
+## First and second wave genes by gene length
+
+Next we'll divide the first and second wave gene groups by transcript length. 
+
+``` {r build_length_plot, echo=FALSE, include=FALSE}
+
+source("shared_code/flybase.r")
+txs <- flybase_with_custom_txs()
+txs <- transform(txs, width = end - start + 1)
+
+split_by_length <- function(rna.df, txs.df, tx.ids) {
+  ids.above_2kb <- as.character(subset(txs.df, fb_tx_id %in% tx.ids & width >  2000)$fb_gene_id)
+  ids.below_2kb <- as.character(subset(txs.df, fb_tx_id %in% tx.ids & width <= 2000)$fb_gene_id)
+
+  long.df <- subset(rna.df, fb_gene_id %in% ids.above_2kb)
+  long.df$length_group <- "Above 2kb"
+  
+  short.df <- subset(rna.df, fb_gene_id %in% ids.below_2kb)
+  short.df$length_group <- "Below 2kb"
+  
+  rbind(long.df, short.df)
+}
+
+length.fw <- split_by_length(rna.tc, txs, fw_all$fb_tx_id)
+length.fw$gene_group <- "First wave"
+
+length.sw.high <- split_by_length(rna.tc, txs, sw_groups$dev_high$fb_tx_id)
+length.sw.high$gene_group <- "Second wave (active)"
+
+length.sw.low <- split_by_length(rna.tc, txs, sw_groups$dev_low$fb_tx_id)
+length.sw.low$gene_group <- "Second wave (poised)"
+
+length.all <- rbind(length.fw, length.sw.high, length.sw.low)
+
+df <- ddply(length.all, .(sample, gene_group, length_group), summarize, median=median(RPKM, na.rm=T), mean=mean(RPKM, na.rm=T))
+df$sample <- factor(df$sample, levels=tps)
+
+g <- ggplot(df, aes(x=as.integer(sample), y=log2(median+1), color=gene_group, linetype=length_group)) + 
+     geom_line() +
+     scale_x_continuous(breaks=1:length(tps), labels=tps) +
+     scale_colour_discrete("") +
+     theme_bw() +
+     theme(panel.grid=element_blank()) +
+     labs(x="Nuclear cycle / time point", y="Median RPKM+1 (log2)", title="Gene expression profiles over time")
+````
+
+``` {r show_length_table, echo=FALSE, results="asis"}
+counts.df <- ddply(length.all, .(gene_group, length_group), summarize, gene_count=pn(length(unique(fb_gene_id))))
+html_table(counts.df)
+````
+
+``` {r show_length_plot, echo=FALSE, fig.cap="", fig.width=10, fig.height=6}
+g
+````
+
+``` {r save_length_pdf, echo=FALSE, include=FALSE}
+pdf(figure_path("rnaseq_expression_over_time_by_length.pdf"), width=10, height=6, onefile=T)
+print(g)
+dev.off()
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

@@ -1,0 +1,100 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+
+knitr.figure_dir <- "figure_1s2a_pol_replicate_consistency_output"
+source("shared_code/knitr_common.r")
+````
+
+# Figure: pre-MBT and MBT Pol II replicate consistency
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## pre-MBT Pol II
+
+Pol II signal at the TSS in replicate 1 vs 2 (pre-MBT wave genes colored):
+
+``` {r build_prembt_pol_plot, echo=FALSE, include=FALSE}
+
+source("shared_code/load_groups.r")
+
+pol_tss.custom <- get(load("step3_check_custom_transcripts_output/pol_tss.custom.RData"))
+pol_tss <- rbind(pol_tss.custom, get(load("pol_tss.flybase.RData")))
+
+r1 <- subset(pol_tss, replicate == "r1" & tp == "preMBT")[, c("fb_tx_id", "tss.ratio")]
+r2 <- subset(pol_tss, replicate == "r2" & tp == "preMBT")[, c("fb_tx_id", "tss.ratio")]
+
+names(r1)[2] <- "ratio.r1"
+names(r2)[2] <- "ratio.r2"
+
+pol.df <- merge(r1, r2)
+pol.df$first_wave <- ifelse(pol.df$fb_tx_id %in% fw_all$fb_tx_id, "Yes", "No")
+
+g.pol_prembt <- ggplot(pol.df, aes(x=ratio.r1, y=ratio.r2, color=first_wave)) + 
+                geom_point(size=1, alpha=0.5) +
+                theme_bw() +
+                scale_colour_manual("pre-MBT gene", 
+                                    values=c("Yes"="red", "No"="gray70"),
+                                    guide=guide_legend(override.aes=list(alpha=1, size=2))) +
+                labs(x="Pol II TSS enrichment in replicate 1 (log2)", 
+                     y="Pol II TSS enrichment in replicate 2 (log2)",
+                     title="Pol II pre-MBT ChIP-seq replicates")
+````
+
+``` {r prembt_figure, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="", fig.width=9, fig.height=6}
+g.pol_prembt
+````
+
+## MBT Pol II
+
+Pol II signal at the TSS in replicate 1 vs 2 (MBT wave genes colored):
+
+``` {r build_mbt_pol_plot, echo=FALSE, include=FALSE}
+
+source("shared_code/load_groups.r")
+
+pol_tss.custom <- get(load("step3_check_custom_transcripts_output/pol_tss.custom.RData"))
+pol_tss <- rbind(pol_tss.custom, get(load("pol_tss.flybase.RData")))
+
+r1 <- subset(pol_tss, replicate == "r1" & tp == "MBT")[, c("fb_tx_id", "tss.ratio")]
+r2 <- subset(pol_tss, replicate == "r3" & tp == "MBT")[, c("fb_tx_id", "tss.ratio")]
+
+names(r1)[2] <- "ratio.r1"
+names(r2)[2] <- "ratio.r2"
+
+pol.df <- merge(r1, r2)
+pol.df$first_wave <- ifelse(pol.df$fb_tx_id %in% sw_all$fb_tx_id, "Yes", "No")
+
+g.pol_mbt <- ggplot(pol.df, aes(x=ratio.r1, y=ratio.r2, color=first_wave)) + 
+             geom_point(size=1, alpha=0.5) +
+             theme_bw() +
+             scale_colour_manual("MBT gene", 
+                                 values=c("Yes"="red", "No"="gray70"),
+                                 guide=guide_legend(override.aes=list(alpha=1, size=2))) +
+             labs(x="Pol II TSS enrichment in replicate 1 (log2)", 
+                  y="Pol II TSS enrichment in replicate 2 (log2)",
+                  title="Pol II MBT ChIP-seq replicates")
+````
+
+``` {r mbt_figure, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="", fig.width=9, fig.height=6}
+g.pol_mbt
+````
+
+``` {r output_pdfs, echo=FALSE, include=FALSE}
+pdf(figure_path("pol_replicate_scatterplots.pdf"), width=9, height=6, onefile=T)
+print(g.pol_prembt)
+print(g.pol_mbt)
+dev.off()
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

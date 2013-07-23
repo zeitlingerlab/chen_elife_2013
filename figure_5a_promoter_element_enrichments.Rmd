@@ -1,0 +1,127 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+
+knitr.figure_dir <- "figure_5a_promoter_element_enrichments_output"
+source("shared_code/knitr_common.r")
+````
+
+# Figure: Promoter element enrichments for first and second wave gene groups
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+``` {r build_figure, echo=FALSE, include=FALSE}
+
+source("shared_code/promoter_element_enrichments.r")
+source("shared_code/zelda_enrichments.r")
+source("shared_code/load_groups.r")
+
+name_with_count <- function(group_name, group_count) {
+  paste0(group_name, "\n", prettyNum(group_count, big.mark=",", preserve.width="individual"), " genes")
+}
+
+idmap <- flybase_with_custom_txs()[, c("fb_gene_id", "fb_tx_id")]
+
+genes.inactive <- subset(idmap, fb_gene_id %in% inactive_gene_ids)
+inactive.txs <- genes.inactive$fb_tx_id[!duplicated(genes.inactive$fb_gene_id)]
+
+all.tx <- data.frame(stringsAsFactors=F, fb_tx_id=as.character(flybase_with_custom_txs()$fb_tx_id))
+
+#all.tx$`pre-MBT`              <- all.tx$fb_tx_id %in% fw_all$fb_tx_id
+all.tx$`pre-MBT paused`       <- all.tx$fb_tx_id %in% fw_groups$paused$fb_tx_id
+all.tx$`pre-MBT dual` <- all.tx$fb_tx_id %in% fw_groups$paused_later$fb_tx_id
+all.tx$`pre-MBT not-paused` <- all.tx$fb_tx_id %in% fw_groups$never_paused$fb_tx_id
+all.tx$`MBT maternal`         <- all.tx$fb_tx_id %in% sw_groups$maternal$fb_tx_id
+#all.tx$`Inactive genes`       <- all.tx$fb_tx_id %in% inactive.txs
+
+sw_all_dev <- rbind(sw_groups$dev_high, sw_groups$dev_low)
+#all.tx$`MBT zygotic`        <- all.tx$fb_tx_id %in% sw_all_dev$fb_tx_id
+all.tx$`MBT active` <- all.tx$fb_tx_id %in% sw_groups$dev_high$fb_tx_id
+all.tx$`MBT poised` <- all.tx$fb_tx_id %in% sw_groups$dev_low$fb_tx_id
+
+results.list <- pe_heatmap_for_tx_lists(all.tx, "pre-MBT and MBT gene groups", manual.group.order=names(all.tx)[c(6:10, 2:5)])
+
+elements <- c("TATA", "Inr", "DPE", "PB", "MTE", "DRE", "Motif1", "Motif6", "Motif7", "GAGA")
+
+data.df <- subset(results.list$data, element %in% elements)
+data.df <- data.df[, c("enrichment", "element", "gene_group", "significant")]
+data.df$element <- as.character(data.df$element)
+data.df$gene_group <- as.character(data.df$gene_group)
+#data.df$gene_group <- gsub("  ", " ", data.df$gene_group)
+#data.df$gene_group <- gsub("  ", " ", data.df$gene_group)
+#data.df$gene_group <- gsub("  ", " ", data.df$gene_group)
+
+# Add custom Zelda
+
+zelda.df <- NULL
+for(group_name in names(all.tx)[-1]) {
+  group.txs <- all.tx$fb_tx_id[all.tx[, group_name] == TRUE]
+  group.df <- zelda_enrichments(zelda, fb.txs, group.txs, name_with_count(group_name, length(group.txs)))
+  zelda.df <- rbind(zelda.df, group.df)
+}
+
+zelda.df.original <- zelda.df
+
+names(zelda.df)[3] <- "gene_group"
+zelda.df$element <- "Zelda"
+zelda.df <- transform(zelda.df, significant = ifelse(pvalue < 0.05 | pvalue > 0.95, "*", ""))
+zelda.df$pvalue <- NULL
+
+zelda.df <- transform(zelda.df, enrichment = ifelse(enrichment > 1, enrichment, -1/enrichment))
+zelda.df$enrichment <- pmin(4,  zelda.df$enrichment)
+zelda.df$enrichment <- pmax(-4, zelda.df$enrichment)
+
+data.df <- rbind(data.df, zelda.df)
+
+elements <- c(elements, "Zelda")
+
+# Build plot
+
+element.order <- c("GAGA", "Zelda", "DRE", "Motif1", "Motif6", "Motif7", "TATA", "Inr", "DPE", "PB", "MTE")
+gene_group.names <- unique(as.character(data.df$gene_group))
+gene_group.indexes <- c(mbt_mat=grep("MBT maternal", gene_group.names), 
+                           mbt_act=grep("MBT active", gene_group.names), 
+                           mbt_poi=grep("MBT poised", gene_group.names),
+                           prembt_np=grep("pre-MBT not-paused", gene_group.names),
+                           prembt_du=grep("pre-MBT dual", gene_group.names),
+                           prembt_p=grep("pre-MBT paused", gene_group.names))
+data.df$element <- factor(data.df$element, levels=element.order)
+data.df$gene_group <- factor(data.df$gene_group, levels=rev(gene_group.names[gene_group.indexes]))
+
+g <- ggplot(data.df, aes(x=element, y=gene_group, fill=enrichment)) + 
+     geom_tile() + 
+     geom_text(aes(label=significant), color="white") +
+     theme_bw() +
+     coord_equal() +
+     scale_fill_gradientn(name="Enrichment", space="rgb", 
+                          values=c(-4, -0.5, 0.5, 4), 
+                          colours=c("#000000", "#cccccc", "#cccccc", "#FC8F00"), 
+                          rescaler=function(x,...) x, oob=identity,
+                          limits=c(-4, 4), guide=guide_colorbar()) +
+     labs(x="", y="", title="pre-MBT and MBT gene groups (0 mismatch version)") +
+     theme(panel.grid.minor=element_blank(),
+           panel.grid.major=element_blank(),
+           axis.text.x=element_text(angle=45, hjust=1))
+
+````
+
+``` {r plot_figure, echo=FALSE, fig.cap="", fig.width=9, height=5, dpi=128}
+g
+````
+
+``` {r pdf_figure, echo=FALSE, include=FALSE}
+pdf(figure_path("promoter_element_enrichments.pdf"), width=10, height=5, onefile=T)
+print(g)
+dev.off()
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

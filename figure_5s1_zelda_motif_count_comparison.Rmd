@@ -1,0 +1,74 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+
+knitr.figure_dir <- "figure_5s1_zelda_motif_count_comparison_output"
+
+source("shared_code/knitr_common.r")
+````
+
+# Figure: Zelda motif counts in first and second wave genes
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+After counting the number of Zelda motifs found in the promoter region of all transcripts (TSS to 2kb upstream) (see [generate_zelda_motif_counts.r](generate_zelda_motif_counts.r)), we can now examine the differences in these counts between the first and second wave genes.
+
+``` {r generate_figure, echo=FALSE, include=FALSE}
+
+source("shared_code/flybase.r")
+source("shared_code/load_groups.r")
+load("zelda_motif_counts.RData")
+
+fb.txs <- flybase_with_custom_txs()
+zd <- subset(zelda.counts, mm == 0)
+zd$mm <- NULL
+zd$count[zd$count > 5] <- 5
+
+fb.txs <- merge(fb.txs, zd, all.x=TRUE)
+
+groups.df <- NULL
+
+add_group <- function(df, all.txs, txs, label) {
+  txs.df <- subset(all.txs, fb_tx_id %in% as.character(txs))
+  txs.df$gene_group <- label
+  rbind(df, txs.df)
+}
+
+groups.df <- add_group(groups.df, fb.txs, fb.txs$fb_tx_id, "All genes")
+groups.df <- add_group(groups.df, fb.txs, sw_all$fb_tx_id, "All MBT genes")
+groups.df <- add_group(groups.df, fb.txs, fw_all$fb_tx_id, "All pre-MBT genes")
+groups.df <- add_group(groups.df, fb.txs, sw_groups$dev_high$fb_tx_id, "MBT developmental active")
+
+groups.df$gene_group <- factor(groups.df$gene_group, levels=unique(groups.df$gene_group))
+
+g <- ggplot(groups.df, aes(x=count)) +
+     geom_histogram(binwidth=1, aes(y=..density..*100)) +
+     scale_x_continuous(breaks=seq(from=0.5, to=5.5, by=1), labels=c(0:4, "5+"), limits=c(0,6)) +
+     labs(x="# of motifs", y="Percent of genes") +
+     theme_bw() + 
+     theme(panel.grid=element_blank()) +
+     facet_wrap(~ gene_group, ncol=4) +
+     ggtitle("Zelda motif matches in promoter (2kb)")
+````
+
+``` {r plot_figure, echo=FALSE, fig.cap=""} 
+g
+````
+
+``` {r pdf_plot, echo=FALSE, include=FALSE}
+pdf(figure_path("zelda_motifs.pdf"), width=12, height=5, onefile=T)
+print(g)
+dev.off()
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

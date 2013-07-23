@@ -1,0 +1,49 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+
+knitr.figure_dir <- "step7_classifying_second_wave_genes_output"
+
+source("shared_code/knitr_common.r")
+source("shared_code/load_groups.r")
+
+````
+
+# Step 7: Classifying second wave genes
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+We classify the second wave genes into 3 groups:
+
+ * **Maternal**: those showing expression in the Eisen RNA-seq data for cell cycle 10 (RPKM >= 1)
+ * **MBT active**: those without expression in cell cycle 10 and expression >= RPKM 5 in cell cycle 14D
+ * **MBT poised**: those without expression in cell cycle 10 and expression < RPKM 5 in cell cycle 14D
+
+``` {r sw_count_table, echo=FALSE, comment=NA, results='asis'}
+sw_table <- data.frame(stringsAsFactors=F, group_name=names(sw_groups), gene_count=pn(sapply(sw_groups, nrow)))
+html_table(sw_table)
+````
+
+``` {r output_spreadsheet, echo=FALSE, include=FALSE}
+add_name_to_group <- function(group_name, groups) {
+  df <- groups[[group_name]]
+  df$classification <- group_name
+  df
+}
+
+sw.dfs <- lapply(names(sw_groups), function(x) { add_name_to_group(x, sw_groups)})
+sw.dfs <- do.call(rbind, sw.dfs)
+sw.dfs <- sw.dfs[order(sw.dfs$classification, sw.dfs$fb_symbol), ]
+write.table(sw.dfs, file=figure_path("second_wave_genes_classified.xls"), quote=F, sep="\t", row.names=F, col.names=T)
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

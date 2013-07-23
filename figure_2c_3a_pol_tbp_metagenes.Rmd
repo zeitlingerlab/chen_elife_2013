@@ -1,0 +1,170 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+library(plyr)
+
+knitr.figure_dir <- "figure_2c_3a_pol_tbp_metagenes_output"
+
+source("shared_code/knitr_common.r")
+
+````
+
+# Figure: Pol II and TBP metagene plots
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Pre-normalized enrichment
+
+We'd like to show the following metagene profiles:
+
+* **pre-MBT stage**
+    - First wave paused
+    - First wave paused later
+    - First wave not paused
+* **MBT stage**
+    - First wave paused
+    - First wave paused later
+    - First wave not paused
+    - Second wave developmental active
+    - Second wave developmental poised
+    - Second wave maternal (all)
+    - Second wave maternal (broad promoters only)
+
+Metagene enrichments were calculated and saved (see [generate_metagene_data_for_all_groups.r](generate_metagene_data_for_all_groups.r)).
+
+``` {r show_gene_counts_table, results="asis"}
+load("metagene.df.RData")
+html_table(unique(metagene.df[, c("gene_group", "group_size")]))
+````
+
+``` {r build_pre_normalized_plot, include=FALSE}
+
+
+fw.groups <- c("FW Paused", "FW Paused later", "FW Not paused")
+sw.groups <- c("SW Dev high", "SW Dev low", "SW Maternal", "SW Maternal (broad)")
+all.groups <- c(fw.groups, sw.groups)
+
+metagene.df <- subset(metagene.df, sample %in% c("Pol II", "TBP"))
+
+reads.mbt <- subset(metagene.df, tp == "MBT" & gene_group %in% all.groups)
+reads.pre_mbt <- subset(metagene.df, tp == "pre-MBT" & gene_group %in% fw.groups)
+
+reads.df <- rbind(reads.mbt, reads.pre_mbt)
+
+reads.df$tp <- factor(reads.df$tp, levels=c("pre-MBT", "MBT"))
+
+g.pn <- ggplot(reads.df, aes(x=tss_distance, y=smooth, color=as.factor(replicate), linetype=sample)) +
+        geom_line() +
+        labs(x="Distance to TSS", y="Average enrichment over WCE", title="Pol II and TBP metagenes") +
+        scale_linetype_discrete("Factor") +
+        scale_colour_discrete("Replicate") +
+        geom_vline(xintercept=0, color="gray50") +
+        geom_hline(yintercept=2, color="gray50", linetype="dashed") +
+        theme_bw() +
+        theme(panel.grid = element_blank()) +
+        facet_grid(gene_group ~ tp, scales="free_y")
+````
+
+``` {r show_pre_normalized_plot, fig.cap="", fig.width=8, fig.height=12}
+g.pn
+````
+
+## Normalize enrichment
+
+Next, we will select the best replicate for each factor/stage combination and normalize so 1 is the maximum enrichment among the gene groups. Based on the above plot, the best replicates are:
+
+* **Pol II**
+    * **pre-MBT**: replicate 2
+    * **MBT**: replicate 3
+* **TBP**
+    * **pre-MBT**: replicate 2
+    * **MBT**: replicate 2
+
+``` {r calc_max_enrichments, comment=NA, results="asis"}
+
+# Filter for best replicates
+
+reads.pol.pre_mbt <- subset(reads.df, tp == "pre-MBT" & sample == "Pol II" & replicate == 2)
+reads.pol.mbt     <- subset(reads.df, tp == "MBT"     & sample == "Pol II" & replicate == 3)
+
+reads.tbp.pre_mbt <- subset(reads.df, tp == "pre-MBT" & sample == "TBP"    & replicate == 2)
+reads.tbp.mbt     <- subset(reads.df, tp == "MBT"     & sample == "TBP"    & replicate == 2)
+
+reads.df <- rbind(reads.pol.pre_mbt, reads.pol.mbt, reads.tbp.pre_mbt, reads.tbp.mbt)
+
+max.enrichments <- ddply(reads.df, .(tp, sample), summarize, max_enrichment      = max(smooth), 
+                                                             found_in_gene_group = gene_group[which.max(smooth)],
+                                                             found_at_location   = tss_distance[which.max(smooth)])
+html_table(max.enrichments)
+````
+
+``` {r normalize_enrichments_and_build_plot, fig.cap="", fig.width=8, fig.height=9}
+reads.df <- merge(reads.df, max.enrichments[, c("tp", "sample", "max_enrichment")])
+
+reads.df <- transform(reads.df, normalized_enrichment = smooth / max_enrichment)
+
+reads.df$tp <- factor(reads.df$tp, levels=c("pre-MBT", "MBT"))
+
+g.n <- ggplot(reads.df, aes(x=tss_distance, y=normalized_enrichment, color=sample)) +
+       geom_line() +
+       labs(x="Distance to TSS", y="Normalized enrichment", title="Pol II and TBP metagenes (normalized)") +
+       scale_colour_discrete("Factor") +
+       geom_vline(xintercept=0, color="gray50") +
+       scale_y_continuous(breaks=c(0, 1), labels=c("Min", "Max")) +
+       theme_bw() +
+       theme(panel.grid = element_blank()) +
+       facet_grid(gene_group ~ tp)
+g.n
+````
+
+The following table shows the location of maximum enrichment for each panel and factor:
+
+``` {r location_of_maximums_table, results="asis"}
+
+all.maxes <- ddply(reads.df, .(gene_group, tp, sample), summarize, max_enrichment    = max(smooth), 
+                                                                   found_at_location = tss_distance[which.max(smooth)])
+
+html_table(all.maxes)
+````
+
+``` {r save_pdfs, include=FALSE}
+
+pdf(figure_path("pol_tbp_metagenes_enrichment.pdf"), width=8, height=12, onefile=T)
+print(g.pn)
+dev.off()
+
+pdf(figure_path("pol_tbp_metagenes_normalized.pdf"), width=8, height=12, onefile=T)
+print(g.n)
+dev.off()
+
+# log2 normalized
+reads.log2 <- transform(reads.df, normalized_enrichment = log2(smooth) / log2(max_enrichment))
+
+g.log2 <- ggplot(reads.log2, aes(x=tss_distance, y=normalized_enrichment, color=sample)) +
+          geom_line() +
+          labs(x="Distance to TSS", y="Normalized enrichment (log2)", title="Pol II and TBP metagenes (normalized, log2)") +
+          scale_colour_discrete("Factor") +
+          geom_vline(xintercept=0, color="gray50") +
+          scale_y_continuous(breaks=c(0, 1), labels=c("Min", "Max")) +
+          theme_bw() +
+          theme(panel.grid = element_blank()) +
+          facet_grid(gene_group ~ tp)
+
+pdf(figure_path("pol_tbp_metagenes_normalized_log2.pdf"), width=8, height=9, onefile=T)
+print(g.log2)
+dev.off()
+
+
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info}
+sessionInfo()
+````

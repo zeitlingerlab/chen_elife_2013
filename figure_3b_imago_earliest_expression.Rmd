@@ -1,0 +1,124 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+library(grid)
+library(plyr)
+
+knitr.figure_dir <- "figure_3b_imago_earliest_expression_output"
+source("shared_code/knitr_common.r")
+````
+
+# Figure: ImaGO earliest expression heatmap
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+``` {r generate_plot, echo=FALSE, include=FALSE}
+
+source("shared_code/stat_tests.r")
+source("shared_code/flybase.r")
+imago <- get(load("imago/insitu.RData"))
+source("shared_code/load_groups.r")
+
+# for each gene, return only the annotations in the earliest stage
+imago <- subset(imago, go_term != "maternal" & go_term != "no staining")
+
+select_earliest_stage <- function(df) {
+  df <- df[order(df$stage_name), ]
+  earliest_stage <- df$stage_name[1]
+  df <- subset(df, stage_name == earliest_stage)
+  df[, c("go_term", "stage_name")]
+}
+
+imago.earliest <- ddply(imago, .var=.(fb_gene_id), select_earliest_stage, .progress="text")
+
+groups.df <- data.frame(stringsAsFactors=F, fb_gene_id=as.character(unique(flybase_txs()$fb_gene_id)))
+groups.df$mbt_high_exp <- groups.df$fb_gene_id %in% sw_groups$dev_high$fb_gene_id
+groups.df$mbt_low_exp  <- groups.df$fb_gene_id %in% sw_groups$dev_low$fb_gene_id
+
+all.imago.genes <- unique(as.character(imago$fb_gene_id))
+
+run_gene_list <- function(listname, genes, df) {
+  gene.universe <- all.imago.genes
+  results <- NULL
+
+  results.cat <- ddply(df, .var=.(gene_group), 
+                           .fun=function(df) { 
+                                  #message("Group: ", df$gene_group[1], " genes: ", length(df$fb_gene_id))
+                                  cbind(listname=listname, fisher_test_2x2(genes, df$fb_gene_id, gene.universe, verbose=FALSE)) 
+                                })  
+  results.cat$adj.pvalue <- p.adjust(results.cat$pvalue, method="BH")
+  results <- rbind(results, results.cat)
+  results
+}
+
+run_group <- function(gl, imago.db) {
+  results <- NULL
+  for(listname in names(gl)[-1]) {
+    message("List: ", listname, appendLF=F)
+    genes <- gl[gl[, listname] == TRUE, 1]
+    message(", ", length(genes), " genes")
+    results.list <- run_gene_list(listname, genes, imago.db)
+    results <- rbind(results, results.list)
+  }
+
+  results.sig <- results
+
+  if(nrow(results.sig) == 0) {
+    return(NULL)
+  }
+
+  results.sig <- subset(results.sig, !(overlap < 2 & test_type == "Enrichment"))
+  results.sig <- subset(results.sig, totalB > 4)
+  results.sig
+}
+
+imago.e.stages <- ddply(imago.earliest, .var=.(stage_name), summarize, fb_gene_id=unique(fb_gene_id))
+names(imago.e.stages)[1] <- "gene_group"
+
+results <- run_group(groups.df, imago.e.stages)
+
+results <- transform(results, sig_label = ifelse(adj.pvalue < 0.05, "*", ""))
+results <- transform(results, enrichment = ifelse(enrichment < 1, -1 / enrichment, enrichment))
+results$enrichment[is.infinite(results$enrichment)] <- 1
+results$enrichment <- pmin(3, results$enrichment)
+results$enrichment <- pmax(-3, results$enrichment)
+
+results$gene_group <- factor(results$gene_group, levels=rev(sort(unique(as.character(results$gene_group)))))
+
+g <- ggplot(results, aes(x=listname, y=gene_group, fill=enrichment)) + 
+     geom_tile() + 
+     geom_text(aes(label=sig_label), color="black") +
+     scale_fill_gradient2(low="#1E1E78", mid="white", high="#F8426D", limits=c(-3, 3)) + 
+     labs(y="", x="", title="ImaGO earliest annotation") +
+     theme_bw() +
+     scale_x_discrete(expand=c(0,0)) + 
+     scale_y_discrete(expand=c(0,0)) +
+     theme(panel.grid   = element_blank(),
+           axis.text.y  = element_text(size=10, hjust=1),
+           axis.text.x  = element_text(size=10, hjust=1, angle=90),
+           plot.margin  = unit(rep(0, times=4), "lines"),
+           panel.margin = unit(rep(0, times=4), "lines"))
+
+````
+
+``` {r plot_figure, echo=FALSE, fig.cap=""}
+g
+````
+
+``` {r save_figure_pdf, echo=FALSE, include=FALSE}
+pdf(figure_path("imago_figure.pdf"), width=5, height=9, onefile=T)
+print(g)
+dev.off()
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

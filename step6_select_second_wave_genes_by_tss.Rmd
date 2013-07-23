@@ -1,0 +1,63 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(plyr)
+library(reshape)
+
+knitr.figure_dir <- "step6_select_second_wave_genes_by_tss_output"
+
+source("shared_code/knitr_common.r")
+````
+
+# Step 6: Selecting second wave genes by Pol II TSS enrichment
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+After calculating Pol II enrichment in the TSS and TU regions ([pol_enrichments_flybase.r](pol_enrichments_flybase.r)) for all three MBT samples, we can now define those genes that have Pol II bound in the second wave of zygotic genome activation.
+
+We will use the following criteria to define an initial list of transcripts based on Flybase annotations:
+
+* Enrichment at least 2-fold above background in the TSS region in all three replicates
+* Genes already selected as first wave genes will be excluded
+
+``` {r pol_tss_calculations, echo=FALSE, message=FALSE}
+
+source("shared_code/tss_tu_summary.r")
+source("shared_code/flybase.r")
+
+pol_tss <- get(load("pol_tss.flybase.RData"))
+pol_tss <- subset(pol_tss, tp == "MBT")
+
+counts.df <- summarize_tss_tu_values(pol_tss, flybase_txs())
+
+df <- subset(counts.df, tss_count == 3)
+
+# Select transcript with maximum mean TSS/TU ratio for tss.wide
+message("Selecting 1 tx per gene")
+tss.selected_tx <- as.character(ddply(df, .(fb_gene_id), summarize, 
+                                      fb_tx_id=fb_tx_id[order(min_tss_signal_quantile, mean_tu, decreasing=TRUE)[1]])$fb_tx_id)
+
+df$highest_tss <- df$fb_tx_id %in% tss.selected_tx
+sw.df <- subset(df, tss_count == 3 & highest_tss == TRUE)
+
+# Remove first wave genes
+
+fw.genes <- as.character(get(load("step4_final_first_wave_gene_list_output/fw.df.RData"))$fb_gene_id)
+sw.df <- subset(sw.df, ! fb_gene_id %in% fw.genes)
+
+save(sw.df, file=figure_path("sw.df.RData"))
+write.table(sw.df, file=figure_path("second_wave_genes_by_tss.xls"), quote=F, sep="\t", row.names=F, col.names=T)
+````
+
+This yields `r pn(nrow(sw.df))` second wave genes.
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

@@ -1,0 +1,88 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+
+knitr.figure_dir <- "figure_1s4_conservation_boxplots_output"
+source("shared_code/knitr_common.r")
+source("shared_code/flybase.r")
+source("shared_code/load_groups.r")
+````
+
+# Figure 1 - Figure supplement 4
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Overview
+
+This plot compares average conservation (phastCon score) for the following gene groups:
+
+ * pre-MBT
+ * MBT zygotic active
+ * MBT zygotic poised
+ * MBT maternal
+ * All others
+
+``` {r load_data, include=FALSE}
+scores.df <- read.delim("phastcon_scores/phastcon_scores.txt", stringsAsFactors=FALSE, header=TRUE)
+txs <- flybase_with_custom_txs()
+txs <- merge(txs, scores.df)
+
+create_labeled_group <- function(group_label, tx_ids_list, all.txs) {
+  group.df <- subset(all.txs, fb_tx_id %in% tx_ids_list[[group_label]])
+  group.df$gene_group <- group_label
+  group.df
+}
+
+group.list <- list("pre-MBT"=fw_all$fb_tx_id,
+                   "MBT zygotic active"=sw_groups$dev_high$fb_tx_id,
+                   "MBT zygotic poised"=sw_groups$dev_low$fb_tx_id,
+                   "MBT maternal"=sw_groups$maternal$fb_tx_id)
+all_groups.txs <- do.call(c, group.list)
+group.list <- c(group.list, list("Others"=txs$fb_tx_id[!txs$fb_tx_id %in% all_groups.txs]))
+
+groups.df <- do.call(rbind, lapply(names(group.list), create_labeled_group, group.list, txs))
+groups.df$gene_group <- factor(groups.df$gene_group, levels=names(group.list))
+```
+
+``` {r make_plot, fig.cap="", fig.width=9, fig.height=5}
+g <- ggplot(groups.df, aes(x=gene_group, y=mean_conservation)) + 
+     geom_boxplot(fill="#f68c64", outlier.size=1) +
+     theme_bw() +
+     theme(panel.grid=element_blank(),
+           axis.text.y=element_text(size=14),
+           axis.text.x=element_text(size=12)) +
+     labs(x="", y="Conservation score", title="Figure 1 - Figure Supplement 4")
+g
+```
+
+``` {r calc_pvalues, include=FALSE}
+
+scores.prembt         <- subset(groups.df, gene_group == "pre-MBT")$mean_conservation
+scores.mbt_zyg_active <- subset(groups.df, gene_group == "MBT zygotic active")$mean_conservation
+scores.mbt_zyg_poised <- subset(groups.df, gene_group == "MBT zygotic poised")$mean_conservation
+
+pv.prembt_vs_zyg_act <- wilcox.test(scores.prembt, scores.mbt_zyg_active, paired=FALSE)$p.value
+pv.prembt_vs_zyg_pos <- wilcox.test(scores.prembt, scores.mbt_zyg_poised, paired=FALSE)$p.value
+```
+
+The Wilcox test p-value for pre-MBT versus MBT zygotic active is `r pv.prembt_vs_zyg_act`.
+
+The Wilcox test p-value for pre-MBT versus MBT zygotic poised is `r pv.prembt_vs_zyg_pos`.
+
+``` {r save_pdf, include=FALSE}
+pdf(figure_path("conservation_boxplots.pdf"), width=9, height=5)
+print(g)
+dev.off()
+```
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE, comment=NA}
+sessionInfo()
+````

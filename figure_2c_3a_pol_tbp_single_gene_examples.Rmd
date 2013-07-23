@@ -1,0 +1,161 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+library(GenomicRanges)
+library(plyr)
+library(scales)
+
+# Returns figure path
+knitr.figure_dir <- "figure_2c_3a_pol_tbp_single_gene_examples_output"
+
+source("shared_code/knitr_common.r")
+
+get_load <- function(filename) {
+  updateObject(get(load(filename)))
+}
+
+source("shared_code/flybase.r")
+source("shared_code/load_groups.r")
+source("shared_code/rdata_common.r")
+
+genes <- c("brk", "Dr", "nullo", "kuk", "sna", "sim", "ac", "sc", "SNCF")
+
+txs <- flybase_with_custom_txs()
+
+txs.fw <- subset(txs, fb_tx_id %in% fw_all$fb_tx_id)
+txs.sw <- subset(txs, fb_tx_id %in% sw_all$fb_tx_id)
+
+##FIX
+pol.2h <- get_load(paste0(rdata_base_path(), "/preMBT_pol_2.cov.RData"))
+tbp.2h <- get_load(paste0(rdata_base_path(), "/preMBT_tbp_1.cov.RData"))
+
+pol.3h <- get_load(paste0(rdata_base_path(), "/MBT_pol_2.cov.RData"))
+tbp.3h <- get_load(paste0(rdata_base_path(), "/MBT_tbp_2.cov.RData"))
+
+pol.4h <- get_load(paste0(rdata_base_path(), "/postMBT_pol_1.cov.RData"))
+tbp.4h <- get_load(paste0(rdata_base_path(), "/postMBT_tbp_1.cov.RData"))
+
+reads.all <- NULL
+geneblocks <- NULL
+
+for(gene_name in genes) {
+  message(gene_name)
+  
+  # Find correct tx (either 1st or 2nd wave)
+  tx <- subset(txs.fw, tolower(fb_symbol) == tolower(gene_name))
+  if(nrow(tx) != 1) {
+    tx <- subset(txs.sw, tolower(fb_symbol) == tolower(gene_name))
+    if(nrow(tx) != 1) stop(" - can't find gene in 1st or 2nd wave")
+  }
+  
+  gene_name   <- tx$fb_symbol
+  gene_start  <- tx$start
+  gene_end    <- tx$end
+  gene_strand <- tx$strand
+  gene_chr    <- tx$chr
+  
+  gene_center <- (gene_start + gene_end) / 2
+  gene_width  <- gene_end - gene_start + 1
+  
+  if(gene_width > 5000) {
+    if(gene_strand == 1) {
+      region_start = gene_start - 1000
+      region_end   = gene_start + 3999
+      gene_end = region_end
+    } else {
+      region_end   = gene_end + 1000
+      region_start = gene_end - 3999
+      gene_start = region_start
+    }
+  } else {
+    region_start = gene_center - 2500
+    region_end   = gene_center + 2499
+  }
+  
+  reads_start <- region_start
+  reads_end   <- region_end
+  
+  message("Region width: ", region_end - region_start + 1)
+  
+  reads.pol.2 <- as.numeric(runmean(pol.2h[[as.character(gene_chr)]][reads_start:reads_end], k=15, endrule="constant"))
+  reads.pol.3 <- as.numeric(runmean(pol.3h[[as.character(gene_chr)]][reads_start:reads_end], k=15, endrule="constant"))
+  reads.pol.4 <- as.numeric(runmean(pol.4h[[as.character(gene_chr)]][reads_start:reads_end], k=15, endrule="constant"))
+
+  reads.tbp.2 <- as.numeric(runmean(tbp.2h[[as.character(gene_chr)]][reads_start:reads_end], k=15, endrule="constant"))
+  reads.tbp.3 <- as.numeric(runmean(tbp.3h[[as.character(gene_chr)]][reads_start:reads_end], k=15, endrule="constant"))
+  reads.tbp.4 <- as.numeric(runmean(tbp.4h[[as.character(gene_chr)]][reads_start:reads_end], k=15, endrule="constant"))
+
+  reads.pol.2 <- data.frame(stringsAsFactors=F, sample="Pol II", timepoint="2h", reads=reads.pol.2, base_position=reads_start:reads_end)
+  reads.pol.3 <- data.frame(stringsAsFactors=F, sample="Pol II", timepoint="3h", reads=reads.pol.3, base_position=reads_start:reads_end)
+  reads.pol.4 <- data.frame(stringsAsFactors=F, sample="Pol II", timepoint="4h", reads=reads.pol.4, base_position=reads_start:reads_end)
+
+  reads.tbp.2 <- data.frame(stringsAsFactors=F, sample="TBP", timepoint="2h", reads=reads.tbp.2, base_position=reads_start:reads_end)
+  reads.tbp.3 <- data.frame(stringsAsFactors=F, sample="TBP", timepoint="3h", reads=reads.tbp.3, base_position=reads_start:reads_end)
+  reads.tbp.4 <- data.frame(stringsAsFactors=F, sample="TBP", timepoint="4h", reads=reads.tbp.4, base_position=reads_start:reads_end)
+  
+  reads.g <- rbind(reads.pol.2, reads.pol.3, reads.pol.4, reads.tbp.2, reads.tbp.3, reads.tbp.4)
+  reads.g$gene_name <- gene_name
+  reads.g$block_start <- gene_start
+  reads.g$block_end <- gene_end
+  reads.g$chr <- gene_chr
+  reads.g$strand = gene_strand
+  reads.all <- rbind(reads.all, reads.g)
+}
+
+topreads <- ddply(reads.all, .(sample, timepoint), summarize, read_max=max(reads))
+reads.all <- merge(reads.all, topreads)
+
+reads.all <- transform(reads.all, nreads = reads / read_max)
+reads.all <- transform(reads.all, nreads = ifelse(nreads > 1, 1, nreads))
+
+
+comma_12_digits <- function(...) {
+  comma(..., digits=12)
+}
+
+pdf(figure_path("pol_tbp_reads_panel.pdf"), width=6, height=7.5, onefile=T)
+
+for(gene in unique(reads.all$gene_name)) {
+  reads.g <- subset(reads.all, gene_name == gene)
+  reads.g <- reads.g[seq(from=1, to=nrow(reads.g), by=5), ]
+
+  gene_chr <- unique(reads.g$chr)
+
+  geneblock <- unique(reads.g[, c("timepoint", "block_start", "block_end")])
+
+  g <- ggplot(reads.g, aes(x=base_position, y=nreads, fill=sample)) +
+       geom_area(alpha=0.5, position = "identity") +
+       geom_segment(inherit.aes=F, data=geneblock, guide="none", size=2, color="darkgreen", aes(x=block_start, xend=block_end, y=-0.1, yend=-0.1)) +
+       facet_wrap(~ timepoint, ncol=1) +
+       scale_x_continuous(label=comma_12_digits) +
+       ylim(-0.1, 1) +
+       theme_bw() +
+       labs(x=paste("Base position on ", gene_chr), y="Normalized reads", title=gene) +
+       theme(axis.text.x=element_text(size=7), 
+             panel.grid.major=element_blank(),
+             panel.grid.minor=element_blank())
+  message(" - plotting: ", gene)
+  print(g)
+}
+
+dev.off()
+
+````
+
+# Figure: Pol II and TBP single gene examples
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+Figure PDF: [pol_tbp_reads_panel.pdf](figure_2c_3a_pol_tbp_single_gene_examples_output/pol_tbp_reads_panel.pdf)
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

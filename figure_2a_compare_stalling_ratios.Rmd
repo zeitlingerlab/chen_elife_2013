@@ -1,0 +1,175 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+library(plyr)
+
+knitr.figure_dir <- "figure_2a_compare_stalling_ratios_output"
+
+source("shared_code/knitr_common.r")
+
+pol_tss <- rbind(get(load("pol_tss.flybase.RData")), get(load("step3_check_custom_transcripts_output/pol_tss.custom.RData")))
+
+pol_tss <- transform(pol_tss, si = pmax(tss.ratio, 0) - pmax(dst.ratio, 0))[, c("fb_tx_id", "tp", "replicate", "si")]
+
+tss.wide <- reshape(pol_tss, idvar=c("fb_tx_id", "tp"), v.names="si", timevar="replicate", direction="wide")
+
+tss.wide$si <- rowMeans(tss.wide[, 3:6], na.rm=TRUE)
+tss.wide <- tss.wide[, c("fb_tx_id", "tp", "si")]
+tss.wide$replicate <- "Average"
+
+pol_tss <- rbind(pol_tss, tss.wide)
+
+source("shared_code/load_groups.r")
+
+````
+
+# Figure: Compare stalling ratios 
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Stalling ratio definition
+
+We calculated stalling ratios by taking the difference between the log2 TSS enrichment (1 to 200bp) and the log2 downstream TSS enrichment (201 to 400bp).
+
+## pre-MBT vs MBT
+
+``` {r preMBT_vs_MBT, fig.cap="", echo=FALSE}
+si.fw <- subset(pol_tss, fb_tx_id %in% fw_all$fb_tx_id & tp == "preMBT")
+si.fw$gene_group <- "All pre-MBT"
+
+si.sw <- subset(pol_tss, fb_tx_id %in% sw_all$fb_tx_id & tp == "MBT")
+si.sw$gene_group <- "All MBT"
+
+si.both <- rbind(si.fw, si.sw)
+si.both <- subset(si.both, is.finite(si))
+
+g1.box <- ggplot(si.both, aes(x=gene_group, fill=replicate, y=si)) +
+          geom_boxplot(outlier.size=1) +
+          theme_bw() +
+          labs(x="", y="Stalling Index", title="pre-MBT vs MBT Stalling Index")
+g1.vio <- ggplot(si.both, aes(x=gene_group, fill=replicate, y=si)) +
+          geom_violin() +
+          theme_bw() +
+          labs(x="", y="Stalling Index", title="pre-MBT vs MBT Stalling Index")
+g1.box
+g1.vio
+````
+
+## pre-MBT gene groups
+
+``` {r preMBT_groups, fig.cap="", echo=FALSE}
+
+df_from_fw_group_name <- function(group_name, fw_list) {
+  group.df <- subset(pol_tss, fb_tx_id %in% fw_list[[group_name]]$fb_tx_id & tp == "preMBT")
+  group.df$gene_group <- group_name
+  group.df
+}
+
+fw.list <- lapply(names(fw_groups), df_from_fw_group_name, fw_groups)
+fw.si   <- do.call(rbind, fw.list)
+
+fw.si <- subset(fw.si, is.finite(si))
+
+g2.box <- ggplot(fw.si, aes(x=gene_group, fill=replicate, y=si)) +
+          geom_boxplot(outlier.size=1) +
+          theme_bw() +
+          labs(x="", y="Stalling Index", title="pre-MBT Groups Stalling Index")
+g2.box
+````
+
+## MBT gene groups
+
+``` {r MBT_groups, fig.cap="", echo=FALSE}
+
+df_from_sw_group_name <- function(group_name, sw_list) {
+  group.df <- subset(pol_tss, fb_tx_id %in% sw_list[[group_name]]$fb_tx_id & tp == "MBT")
+  group.df$gene_group <- group_name
+  group.df
+}
+
+sw.list <- lapply(names(sw_groups), df_from_sw_group_name, sw_groups)
+sw.si   <- do.call(rbind, sw.list)
+
+# Add pre-MBT genes during MBT
+fw_during_mbt <- subset(pol_tss, tp == "MBT" & fb_tx_id %in% fw_all$fb_tx_id)
+fw_during_mbt$gene_group <- "pre-MBT\n(during MBT)"
+
+sw.si <- rbind(sw.si, fw_during_mbt)
+
+sw.si <- subset(sw.si, is.finite(si))
+
+g3.box <- ggplot(sw.si, aes(x=gene_group, fill=replicate, y=si)) +
+          geom_boxplot(outlier.size=1) +
+          theme_bw() +
+          labs(x="", y="Stalling Index", title="MBT Groups Stalling Index")
+g3.box
+````
+
+## Combined figures
+
+### Main figure
+
+``` {r preMBT_MBT_comparison_violin, echo=FALSE, fig.width=3, fig.cap=""}
+si.both$gene_group <- factor(si.both$gene_group, levels=rev(sort(unique(as.character(si.both$gene_group)))))
+main.fig.data <- subset(si.both, replicate == "Average")
+main.fig <- ggplot(main.fig.data, aes(x=gene_group, y=si)) +
+            geom_violin() +
+            theme_bw() +
+            theme(panel.grid=element_blank()) +
+            labs(x="", y="Stalling Index", title="pre-MBT vs MBT Stalling Index")
+main.fig
+````
+
+### Supplemental figure
+
+``` {r groups_comparison_boxplot, echo=FALSE, fig.cap=""}
+sup.fig.data <- subset(rbind(fw.si, sw.si), replicate == "Average")
+sup.fig.data$gene_group[which(sup.fig.data$gene_group == "dev_high")] <- "MBT zygotic"
+sup.fig.data$gene_group[which(sup.fig.data$gene_group == "dev_low")]  <- "MBT zygotic"
+sup.fig.data$gene_group[which(sup.fig.data$gene_group == "maternal")] <- "MBT maternal"
+sup.fig.data$gene_group[which(sup.fig.data$gene_group == "never_paused")] <- "pre-MBT\nNever paused"
+sup.fig.data$gene_group[which(sup.fig.data$gene_group == "paused_later")] <- "pre-MBT\nPaused later"
+sup.fig.data$gene_group[which(sup.fig.data$gene_group == "paused")] <- "pre-MBT\nPaused"
+
+gene_group_order <- c("pre-MBT\nNever paused", "pre-MBT\nPaused later", "pre-MBT\nPaused",
+                      "MBT zygotic", "MBT maternal", "pre-MBT\n(during MBT)")
+
+sup.fig.data$gene_group <- factor(sup.fig.data$gene_group, levels=gene_group_order)
+sup.fig <- ggplot(sup.fig.data, aes(x=gene_group, y=si)) +
+            geom_boxplot(outlier.size=1) +
+            theme_bw() +
+            theme(panel.grid=element_blank()) +
+            labs(x="", y="Stalling Index", title="pre-MBT vs MBT Stalling Index")
+sup.fig
+````
+
+``` {r build_pdf, include=FALSE}
+
+pdf(figure_path("stalling_index_plots_individual.pdf"), width=9, height=6, onefile=T)
+print(g1.box)
+print(g1.vio)
+print(g2.box)
+print(g3.box)
+dev.off()
+
+pdf(figure_path("preMBT_vs_MBT_stalling_index.pdf"), width=4.5, height=6, onefile=T)
+print(main.fig)
+dev.off()
+
+pdf(figure_path("preMBT_and_MBT_gene_groups_stalling_index.pdf"), width=9, height=6, onefile=T)
+print(sup.fig)
+dev.off()
+
+````
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, echo=FALSE}
+sessionInfo()
+````

@@ -1,0 +1,1 @@
+sample	name	tp	control	antibody	usepreMBT_pol_1	r1	preMBT	preMBT_wce_1	8wg16	1preMBT_pol_2	r2	preMBT	preMBT_wce_1	8wg16	1preMBT_pol_3	r3	preMBT	preMBT_wce_1	8wg16	1preMBT_pol_4	r4	preMBT	preMBT_wce_1	8wg16	1MBT_pol_1	r1	MBT	MBT_wce_1	8wg16	1MBT_pol_2	r2	MBT	MBT_wce_1	8wg16	1MBT_pol_3	r3	MBT	MBT_wce_1	8wg16	1

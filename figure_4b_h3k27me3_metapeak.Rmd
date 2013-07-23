@@ -1,0 +1,89 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+library(reshape)
+library(knitcitations)
+
+knitr.figure_dir <- "figure_4b_h3k27me3_metapeak_output"
+
+source("shared_code/knitr_common.r")
+source("shared_code/granges_common.r")
+source("shared_code/metagene_graphs.R")
+source("shared_code/rdata_common.r")
+````
+
+# Figure 4B: H3K27me3 enrichment around PREs
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Overview
+
+Using PHO-bound regions obtained from Supplemental Table 17 of `r citet("10.1371/journal.pbio.1000013")`, we will plot a metapeak of H3K27me3 enrichment centered at these regions for MBT, post-MBT and 6-8h AEL time points.
+
+``` {r load_data, echo=FALSE, include=FALSE}
+pho <- read.delim("schuettengruber_2009/pho_regions.txt", stringsAsFactors=FALSE, header=TRUE)
+names(pho) <- tolower(names(pho))
+pho$chr <- gsub("CHR", "chr", pho$chr)
+pho$start <- with(pho, (start + end) / 2)
+pho$stop  <- pho$start + 100000
+pho$strand <- 1
+
+cache.file <- figure_path("reads.rds")
+if(file.exists(cache.file)) {
+  reads.all <- readRDS(cache.file)
+} else {
+  mbt_k27.cov     <- get_load(paste0(rdata_base_path(), "MBT_k27_1.cov.RData"))
+  mbt_wce.cov     <- get_load(paste0(rdata_base_path(), "MBT_wce_1.cov.RData"))
+  postmbt_k27.cov <- get_load(paste0(rdata_base_path(), "postMBT_k27_1.cov.RData"))
+  postmbt_wce.cov <- get_load(paste0(rdata_base_path(), "postMBT_wce_1.cov.RData"))
+  t6h_k27.cov     <- get_load(paste0(rdata_base_path(), "06to08h_k27_1.cov.RData"))
+
+  metapeak.margin <- 100000
+  reads.mbt <- get_metagene_enrichment(mbt_k27.cov, mbt_wce.cov, pho, 
+                                       before_tss=metapeak.margin, after_tss=metapeak.margin, smooth=500, sample="MBT")
+  reads.postmbt <- get_metagene_enrichment(postmbt_k27.cov, postmbt_wce.cov, pho, 
+                                           before_tss=metapeak.margin, after_tss=metapeak.margin, smooth=500, sample="post-MBT")
+  reads.t6h <- get_metagene_enrichment(t6h_k27.cov, mbt_wce.cov, pho, 
+                                       before_tss=metapeak.margin, after_tss=metapeak.margin, smooth=500, sample="6-8h AEL")
+
+  sample_reads <- function(df, every=500) {
+    df <- df[seq(from=1, to=nrow(df), by=500), ]  
+  }
+
+  reads.all <- rbind(sample_reads(reads.mbt), sample_reads(reads.postmbt), sample_reads(reads.t6h))
+  saveRDS(reads.all, file=cache.file)  
+}
+
+```
+
+``` {r metapeak_plot, echo=FALSE, fig.cap="", fig.width=9, fig.height=5}
+g <- ggplot(reads.all, aes(x=tss_distance, y=smooth, linetype=sample)) +
+     geom_line(color="darkgreen", size=1.2) +
+     theme_bw() +
+     labs(x="Distance to PHO binding location", y="Average enrichment over WCE")
+g
+```
+
+``` {r save_pdf}
+pdf(figure_path("k27_metapeak.pdf"), width=9, height=6)
+print(g)
+dev.off()
+```
+
+## References
+
+``` {r references, results="asis"}
+bibliography(style="html")
+```
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, comment=NA, echo=FALSE}
+sessionInfo()
+````

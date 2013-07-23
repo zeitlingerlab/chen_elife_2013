@@ -1,0 +1,1 @@
+sample	name	tp	control	usepreMBT_tbp_1	r1	preMBT	preMBT_wce_1	1preMBT_tbp_2	r2	preMBT	preMBT_wce_1	1MBT_tbp_1	r1	MBT	MBT_wce_1	1MBT_tbp_2	r2	MBT	MBT_wce_1	1

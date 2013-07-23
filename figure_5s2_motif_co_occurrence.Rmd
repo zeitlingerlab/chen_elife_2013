@@ -1,0 +1,240 @@
+``` {r setup, echo=FALSE, message=FALSE, results="hide"}
+library(xtable)
+library(ggplot2)
+library(reshape)
+library(stringr)
+library(gridExtra)
+
+knitr.figure_dir <- "figure_5s2_motif_co_occurrence_output"
+
+source("shared_code/knitr_common.r")
+source("shared_code/stat_tests.r")
+````
+
+# Core promoter motif co-ocurrence analysis (pre-MBT and MBT versus all)
+
+**Project:** `r knitr.project_name`
+
+**Author:** [Jeff Johnston](mailto:jjj@stowers.org)
+
+**Generated:** `r format(Sys.time(), "%a %b %d %Y, %I:%M %p")`
+
+## Overview
+
+Here, we will compare the co-occurrence of core promoter motifs (0 mismatch) in two sets of genes:
+
+ * Our pre-MBT and MBT genes combined
+ * All annotated promoters
+
+``` {r helper_functions, warning=FALSE, message=FALSE, include=FALSE}
+
+compare_elements <- function(pe.df, universe_tx_ids, element1, element2) {
+  pe.df <- subset(pe.df, fb_tx_id %in% universe_tx_ids)
+  element1_ids <- as.character(pe.df$fb_tx_id[pe.df[, element1] == TRUE])
+  element2_ids <- as.character(pe.df$fb_tx_id[pe.df[, element2] == TRUE])
+  universe_ids <- as.character(pe.df$fb_tx_id)
+  test.df <- fisher_test_2x2(element1_ids, element2_ids, universe_ids, verbose=FALSE)
+  test.df$element1 <- element1
+  test.df$element2 <- element2
+  test.df
+}
+
+combo_loop <- function(i, combos.df, pe.df, universe.txs) {
+  compare_elements(pe.df, universe.txs, combos.df$element1[i], combos.df$element2[i])
+}
+
+clustered_order <- function(test.df) {
+  zero.e <- which(test.df$enrichment == 0)
+  if(length(zero.e) > 0) test.df$enrichment[zero.e] <- 1
+  test.df$enrichment <- ifelse(test.df$enrichment < 1, -1 / test.df$enrichment, test.df$enrichment)
+  test.df$enrichment <- pmax(-2, test.df$enrichment)
+  test.df$enrichment <- pmin(2, test.df$enrichment)
+
+  test.wide <- reshape(test.df[, c("element1", "element2", "enrichment")], 
+                       idvar="element1", v.names="enrichment", timevar="element2", direction="wide")
+  test.m <- as.matrix(test.wide[, -1])
+  rownames(test.m) <- test.wide$element1
+  test.m[is.na(test.m)] <- 1
+  
+  row.d <- as.dendrogram(hclust(dist(test.m)))
+  element.order <- rownames(test.m)[order.dendrogram(row.d)]
+  element.order
+}
+
+build_plot <- function(test.df, title, motif.order) {
+  zero.e <- which(test.df$enrichment == 0)
+  if(length(zero.e) > 0) test.df$enrichment[zero.e] <- 1
+  test.df$enrichment <- ifelse(test.df$enrichment < 1, -1 / test.df$enrichment, test.df$enrichment)
+  
+  test.df$enrichment <- pmax(-2, test.df$enrichment)
+  test.df$enrichment <- pmin(2, test.df$enrichment)
+  
+  test.df$significant <- ifelse(test.df$pvalue < 0.05, "*", " ")
+  test.df$element1 <- factor(test.df$element1, levels=motif.order)
+  test.df$element2 <- factor(test.df$element2, levels=motif.order)
+  
+  g <- ggplot(test.df, aes(x=element1, y=element2, fill=enrichment)) +
+       geom_tile(color="gray20") +
+       geom_text(color="white", aes(label=significant), size=15) +
+       scale_fill_gradientn(name="Enrichment/\nDepletion", space="rgb", 
+                            values=c(-2, -1, 1, 2), 
+                            colours=c("#000000", "#cccccc", "#cccccc", "#FC8F00"),
+                            rescaler=function(x,...) x, oob=identity,
+                            limits=c(-2, 2), guide=guide_colorbar()) +       theme_bw() +
+       theme(panel.grid=element_blank(), 
+             axis.text.x=element_text(size=14),
+             axis.text.y=element_text(size=14)) +
+       labs(x="", y="", title=paste0(title, "\n", pn(test.df$universe[1]), " transcripts"))
+  g
+}
+
+```
+
+### pre-MBT and MBT genes
+
+``` {r load_data, include=FALSE}
+source("shared_code/load_groups.r")
+pe.df <- get(load("promoter_elements/pe.0mm.RData"))
+
+elements <- c("DRE", "Motif1", "Motif6", "Motif7", "Zelda", "TATA", "Inr", "GAGA", "DPE", "PB", "MTE")
+combos.df <- as.data.frame(do.call(rbind, combn(elements, 2, simplify=FALSE)), stringsAsFactors=FALSE)
+names(combos.df) <- c("element1", "element2")
+combos.rev.df <- combos.df
+names(combos.rev.df) <- c("element2", "element1")
+combos.df <- rbind(combos.df, combos.rev.df)
+```
+
+``` {r test_mbt, message=FALSE, fig.cap="", fig.width=9, fig.height=9}
+prembt_mbt.ids <- c(fw_all$fb_tx_id, sw_all$fb_tx_id)
+mbt.test <- do.call(rbind, lapply(1:nrow(combos.df), combo_loop, combos.df, pe.df, prembt_mbt.ids))
+
+mbt.order <- clustered_order(mbt.test)
+
+mbt.g <- build_plot(mbt.test, "pre-MBT and MBT genes", mbt.order) #elements)
+mbt.g
+```
+
+### All annotated promoters
+
+To avoid double-counting the same promoter when it has multiple annotated transcripts, we select only unique promoters by transcription start site and strand.
+
+``` {r test_all, message=FALSE, fig.cap="", fig.width=9, fig.height=9}
+source("shared_code/flybase.r")
+txs <- flybase_with_custom_txs()
+txs <- transform(txs, tss = ifelse(strand == 1, start, end))
+txs <- transform(txs, tss_id = paste(chr, tss, strand, sep="_"))
+txs.uniq <- txs[!duplicated(txs$tss_id), ]
+
+all.test <- do.call(rbind, lapply(1:nrow(combos.df), combo_loop, combos.df, pe.df, txs.uniq$fb_tx_id))
+all.g <- build_plot(all.test, "All promoters", mbt.order) #elements)
+all.g
+```
+
+### FitzGerald data
+
+``` {r process_fitzgerald_data, include=FALSE}
+fitz.counts <- read.delim("fitzgerald_promoter_counts/counts.txt", stringsAsFactors=FALSE)
+calc_pvalue_for_row <- function(i, counts.df) {
+
+  count.A <- counts.df$motif1_count[i]
+  count.B <- counts.df$motif2_count[i]
+  count.universe <- counts.df$universe_count[i]
+
+  count.overlap <- counts.df$overlap[i]
+  count.Aonly   <- count.A - count.overlap
+  count.Bonly   <- count.B - count.overlap
+  count.neither <- count.universe - count.Aonly - count.overlap - count.Bonly
+
+  m <- matrix(c(count.overlap, count.Aonly, count.Bonly, count.neither), nrow=2, byrow=T)
+
+  prop1 <- count.overlap / count.A
+  prop2 <- count.Bonly / (count.universe - count.A)
+
+  if(is.na(prop2)) prop2 <- -1
+  
+  alt.test <- ifelse(prop1 > prop2, "greater", "less")
+  
+  # Perform the test
+  result <- fisher.test(m, alternative=alt.test)
+  
+  obs <- count.overlap / count.A
+  exp <- count.B / count.universe
+
+  enrichment <- obs / exp
+  
+  # Return the result
+  result.df <- data.frame(stringsAsFactors=FALSE,
+                          element1=counts.df$motif1[i],
+                          element2=counts.df$motif2[i],
+                          test_type=ifelse(alt.test == "greater", "Enrichment", "Depletion"), 
+                          pvalue=result$p.value,
+                          overlap = as.integer(count.overlap),
+                          totalA  = count.A,
+                          totalB  = count.B,
+                          universe = count.universe,
+                          enrichment = enrichment)
+  result.df
+}
+
+fitz.test <- do.call(rbind, lapply(1:nrow(fitz.counts), calc_pvalue_for_row, fitz.counts))
+
+fitz.rev <- fitz.test
+names(fitz.rev)[1:2] <- c("element2", "element1")
+fitz.test <- rbind(fitz.test, fitz.rev)
+```
+
+``` {r plot_fitz, message=FALSE, fig.cap="", fig.width=9, fig.height=9}
+fitz.g <- build_plot(fitz.test, "FitzGerald all promoters", mbt.order) #elements)
+fitz.g
+```
+
+## Summary of significant differences
+
+Below are the motif pairs that have signficant enrichment or depletion in the pre-MBT/MBT genes but not in all genes:
+
+``` {r summary_table, results="asis"}
+
+all.test <- transform(all.test, description = paste0(test_type, " of ", element1, " / ", element2))
+mbt.test <- transform(mbt.test, description = paste0(test_type, " of ", element1, " / ", element2))
+
+sig.all <- subset(all.test, pvalue < 0.05)$description
+sig.mbt <- subset(mbt.test, pvalue < 0.05)$description
+html_table(subset(mbt.test, description %in% sig.mbt[!sig.mbt %in% sig.all])[, c("description", "pvalue")])
+```
+
+Below are the motifs pairs that have significant enrichment or depletion in all genes but not in the pre-MBT/MBT genes:
+
+``` {r summary_table_all, results="asis"}
+html_table(subset(all.test, description %in% sig.all[!sig.all %in% sig.mbt])[, c("description", "pvalue")])
+```
+
+``` {r export_tables, include=FALSE}
+
+all.test <- transform(all.test, score = -1 * log10(pvalue))
+mbt.test <- transform(mbt.test, score = -1 * log10(pvalue))
+fitz.test <- transform(fitz.test, score = -1 * log10(pvalue))
+
+save_test <- function(df, filename) {
+  df <- subset(df, test_type == "Enrichment" & pvalue < 0.05)
+  write.table(df[, c("element1", "element2", "score")], file=filename, quote=F, sep="\t", row.names=F, col.names=T)
+}
+
+save_test(all.test,  figure_path("motif_pairs_all.txt"))
+save_test(mbt.test,  figure_path("motif_pairs_mbt.txt"))
+save_test(fitz.test, figure_path("motif_pairs_fitz.txt"))
+```
+
+``` {r export_pdf, include=FALSE}
+
+pdf(figure_path("combined_heatmap.pdf"), width=27, height=9)
+grid.arrange(fitz.g, all.g, mbt.g, ncol=3)
+dev.off()
+```
+
+## Session information
+
+For reproducibility, this analysis was performed with the following R/Bioconductor session:
+
+``` {r session_info, comment=NA, echo=FALSE}
+sessionInfo()
+````
