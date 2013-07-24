@@ -177,7 +177,7 @@ cd flybase
 wget 'ftp://ftp.flybase.net/releases/FB2012_05/dmel_r5.47/fasta/dmel-all-chromosome-r5.47.fasta.gz'
 gunzip dmel-all-chromosome-r5.47.fasta.gz 
 /data/apps/bowtie2/bowtie2-build -o 1 dmel-all-chromosome-r5.47.fasta fb_547_genome
-mkdir /data/tophat_cufflinks/genome
+mkdir -p /data/tophat_cufflinks/genome
 mv fb_547_genome.* /data/tophat_cufflinks/genome
 ```
 
@@ -227,40 +227,40 @@ Align all single-end samples:
 
 ```bash
 cd /data/fastq
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(fastx_trimmer -Q 33 -l 40 -i <(gunzip -c preMBT_k4_1.fastq.gz)) | samtools view -F 4 -Sbo preMBT_k4_1.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_k4_2.fastq.gz) | samtools view -F 4 -Sbo preMBT_k4_2.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_pol_1.fastq.gz) | samtools view -F 4 -Sbo preMBT_pol_1.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_pol_2.fastq.gz) | samtools view -F 4 -Sbo preMBT_pol_2.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(fastx_trimmer -Q 33 -l 40 -i <(gunzip -c preMBT_pol_3.fastq.gz)) | samtools view -F 4 -Sbo preMBT_pol_3.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_pol_4.fastq.gz) | samtools view -F 4 -Sbo preMBT_pol_4.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_tbp_1.fastq.gz) | samtools view -F 4 -Sbo preMBT_tbp_1.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_tbp_2.fastq.gz) | samtools view -F 4 -Sbo preMBT_tbp_2.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_wce_1.fastq.gz) | samtools view -F 4 -Sbo preMBT_wce_1.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(fastx_trimmer -Q 33 -l 40 -i <(gunzip -c MBT_h3ac_1.fastq.gz)) | samtools view -F 4 -Sbo MBT_h3ac_1.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_h3ac_2.fastq.gz) | samtools view -F 4 -Sbo MBT_h3ac_2.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(fastx_trimmer -Q 33 -l 40 -i <(gunzip -c MBT_k27_1.fastq.gz)) | samtools view -F 4 -Sbo MBT_k27_1.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_k4_1.fastq.gz) | samtools view -F 4 -Sbo MBT_k4_1.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_k4_2.fastq.gz) | samtools view -F 4 -Sbo MBT_k4_2.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_pol_1.fastq.gz) | samtools view -F 4 -Sbo MBT_pol_1.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_pol_2.fastq.gz) | samtools view -F 4 -Sbo MBT_pol_2.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(fastx_trimmer -Q 33 -l 40 -i <(gunzip -c MBT_pol_3.fastq.gz)) | samtools view -F 4 -Sbo MBT_pol_3.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_tbp_1.fastq.gz) | samtools view -F 4 -Sbo MBT_tbp_1.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_tbp_2.fastq.gz) | samtools view -F 4 -Sbo MBT_tbp_2.bam -
-/data/apps/bowtie/bowtie  -S -p 8 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_wce_1.fastq.gz) | samtools view -F 4 -Sbo MBT_wce_1.bam -
-/data/apps/bowtie/bowtie --solexa1.3-quals -S -p 8 -m 1 -l 18 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c postMBT_k27_1.fastq.gz) | samtools view -F 4 -Sbo postMBT_k27_1.bam -
-/data/apps/bowtie/bowtie --solexa1.3-quals -S -p 8 -m 1 -l 18 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c postMBT_pol_1.fastq.gz) | samtools view -F 4 -Sbo postMBT_pol_1.bam -
-/data/apps/bowtie/bowtie --solexa1.3-quals -S -p 8 -m 1 -l 18 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c postMBT_tbp_1.fastq.gz) | samtools view -F 4 -Sbo postMBT_tbp_1.bam -
-/data/apps/bowtie/bowtie --solexa1.3-quals -S -p 8 -m 1 -l 18 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c postMBT_wce_1.fastq.gz) | samtools view -F 4 -Sbo postMBT_wce_1.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(fastx_trimmer -Q 33 -l 40 -i <(gunzip -c preMBT_k4_1.fastq.gz)) | samtools view -F 4 -Sbo preMBT_k4_1.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_k4_2.fastq.gz) | samtools view -F 4 -Sbo preMBT_k4_2.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_pol_1.fastq.gz) | samtools view -F 4 -Sbo preMBT_pol_1.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_pol_2.fastq.gz) | samtools view -F 4 -Sbo preMBT_pol_2.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(fastx_trimmer -Q 33 -l 40 -i <(gunzip -c preMBT_pol_3.fastq.gz)) | samtools view -F 4 -Sbo preMBT_pol_3.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_pol_4.fastq.gz) | samtools view -F 4 -Sbo preMBT_pol_4.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_tbp_1.fastq.gz) | samtools view -F 4 -Sbo preMBT_tbp_1.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_tbp_2.fastq.gz) | samtools view -F 4 -Sbo preMBT_tbp_2.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c preMBT_wce_1.fastq.gz) | samtools view -F 4 -Sbo preMBT_wce_1.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(fastx_trimmer -Q 33 -l 40 -i <(gunzip -c MBT_h3ac_1.fastq.gz)) | samtools view -F 4 -Sbo MBT_h3ac_1.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_h3ac_2.fastq.gz) | samtools view -F 4 -Sbo MBT_h3ac_2.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(fastx_trimmer -Q 33 -l 40 -i <(gunzip -c MBT_k27_1.fastq.gz)) | samtools view -F 4 -Sbo MBT_k27_1.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_k4_1.fastq.gz) | samtools view -F 4 -Sbo MBT_k4_1.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_k4_2.fastq.gz) | samtools view -F 4 -Sbo MBT_k4_2.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_pol_1.fastq.gz) | samtools view -F 4 -Sbo MBT_pol_1.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_pol_2.fastq.gz) | samtools view -F 4 -Sbo MBT_pol_2.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(fastx_trimmer -Q 33 -l 40 -i <(gunzip -c MBT_pol_3.fastq.gz)) | samtools view -F 4 -Sbo MBT_pol_3.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_tbp_1.fastq.gz) | samtools view -F 4 -Sbo MBT_tbp_1.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_tbp_2.fastq.gz) | samtools view -F 4 -Sbo MBT_tbp_2.bam -
+/data/apps/bowtie/bowtie  -S -p 4 -m 1 -l 40 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c MBT_wce_1.fastq.gz) | samtools view -F 4 -Sbo MBT_wce_1.bam -
+/data/apps/bowtie/bowtie --solexa1.3-quals -S -p 4 -m 1 -l 18 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c postMBT_k27_1.fastq.gz) | samtools view -F 4 -Sbo postMBT_k27_1.bam -
+/data/apps/bowtie/bowtie --solexa1.3-quals -S -p 4 -m 1 -l 18 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c postMBT_pol_1.fastq.gz) | samtools view -F 4 -Sbo postMBT_pol_1.bam -
+/data/apps/bowtie/bowtie --solexa1.3-quals -S -p 4 -m 1 -l 18 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c postMBT_tbp_1.fastq.gz) | samtools view -F 4 -Sbo postMBT_tbp_1.bam -
+/data/apps/bowtie/bowtie --solexa1.3-quals -S -p 4 -m 1 -l 18 -k 1 -n 2 --best --strata /data/dm3_genome/dm3 <(gunzip -c postMBT_wce_1.fastq.gz) | samtools view -F 4 -Sbo postMBT_wce_1.bam -
 ````
 
 Align all paired-end samples:
 
 ```bash
 # K27 postMBT (fragment size 146)
-/data/apps/bowtie/bowtie -S -p 8 -m 1 -l 50 -k 1 -n 2 --best --strata --chunkmbs 1024 -X 300 -1 <(gunzip -c 06to08h_k27_1_read1.fastq.gz) -2 <(gunzip -c 06to08h_k27_1_read2.fastq.gz) /data/dm3_genome/dm3 | samtools view -F 4 -Sbo 06to08h_k27_1.bam -
+/data/apps/bowtie/bowtie -S -p 4 -m 1 -l 50 -k 1 -n 2 --best --strata --chunkmbs 1024 -X 300 -1 <(gunzip -c 06to08h_k27_1_read1.fastq.gz) -2 <(gunzip -c 06to08h_k27_1_read2.fastq.gz) /data/dm3_genome/dm3 | samtools view -F 4 -Sbo 06to08h_k27_1.bam -
 
 # MNase MBT (fragment size 146)
-/data/apps/bowtie/bowtie -S -p 8 -m 1 -l 50 -k 1 -n 2 --best --strata --chunkmbs 1024 -X 300 -1 <(gunzip -c MBT_mnase_1_read1.fastq.gz) -2 <(gunzip -c MBT_mnase_1_read2.fastq.gz) /data/dm3_genome/dm3 | samtools view -F 4 -Sbo MBT_mnase_1.bam -
+/data/apps/bowtie/bowtie -S -p 4 -m 1 -l 50 -k 1 -n 2 --best --strata --chunkmbs 1024 -X 300 -1 <(gunzip -c MBT_mnase_1_read1.fastq.gz) -2 <(gunzip -c MBT_mnase_1_read2.fastq.gz) /data/dm3_genome/dm3 | samtools view -F 4 -Sbo MBT_mnase_1.bam -
 ```
 
 ## Align Eisen RNA-seq samples
@@ -272,7 +272,7 @@ Create /data/tophat\_cufflinks/run\_tophat\_for\_directory.sh:
 
 cd $1
 fastq_files=`ls -1 *.fq.gz | paste -s -d,`
-/data/apps/tophat/tophat -G /data/tophat_cufflinks/fb-r5.47.gtf -p 8 -I 5000 -z pigz --segment-length=20 -o tophat \
+/data/apps/tophat/tophat -G /data/tophat_cufflinks/fb-r5.47.gtf -p 4 -I 5000 -z pigz --segment-length=20 -o tophat \
                     --transcriptome-index=/data/tophat_cufflinks/tophat_index/index \
                     /data/tophat_cufflinks/genome/fb_547_genome \
                     $fastq_files
@@ -283,6 +283,7 @@ Run the file for all Eisen RNA-seq samples:
 
 ```bash
 cd /data/tophat_cufflinks
+cp ~/analysis_code/flybase/fb-r5.47.gtf .
 for sample in 10 11 12 13 14A 14B 14C 14D
 do
   mkdir $sample
@@ -311,7 +312,7 @@ Create /data/tophat\_cufflinks/run\_pe_tophat\_for\_directory.sh:
 cd $1
 fastq_files_r1=`ls -1 *_1.fastq.gz | paste -s -d,`
 fastq_files_r2=`ls -1 *_2.fastq.gz | paste -s -d,`
-/data/apps/tophat/tophat -G /data/tophat_cufflinks/fb-r5.47.gtf -p 8 -I 5000 -z pigz --segment-length=38 -o tophat \
+/data/apps/tophat/tophat -G /data/tophat_cufflinks/fb-r5.47.gtf -p 4 -I 5000 -z pigz --segment-length=38 -o tophat \
                     --transcriptome-index=/data/tophat_cufflinks/tophat_index/index \
                     /data/tophat_cufflinks/genome/fb_547_genome \
                     $fastq_files_r1 $fastq_files_r2
@@ -330,8 +331,8 @@ do
   cd ..
 done
 
-./run\_pe\_tophat\_for\_directory.sh we04to06h
-./run\_pe\_tophat\_for\_directory.sh we06to08h
+./run_pe_tophat_for_directory.sh we04to06h
+./run_pe_tophat_for_directory.sh we06to08h
 ```
 
 ## Process RNA-seq alignments with Cufflinks
@@ -340,7 +341,7 @@ Run cuffdiff on the Eisen RNA-seq samples:
 
 ```bash
 cd /data/tophat_cufflinks
-/data/apps/cufflinks/cuffdiff -p 8 -u -b genome/fb_547_genome.fa -L cc10,cc11,cc12,cc13,cc14a,cc14b,cc14c,cc14d \
+/data/apps/cufflinks/cuffdiff -p 4 -u -b genome/fb_547_genome.fa -L cc10,cc11,cc12,cc13,cc14a,cc14b,cc14c,cc14d \
     -o cuffdiff2 \
     fb-r5.47.gtf \
     10/tophat/accepted_hits.bam \
@@ -358,7 +359,7 @@ Run cufflinks individually on the two whole-embryo RNA-seq samples:
 
 ```bash
 cd /data/tophat_cufflinks/we04to06h
-/data/apps/cufflinks/cufflinks -p 8 --compatible-hits-norm -I 5000 \
+/data/apps/cufflinks/cufflinks -p 4 --compatible-hits-norm -I 5000 \
 	-G /data/tophat_cufflinks/fb-r5.47.gtf \
 	-u \
 	-b /data/tophat_cufflinks/genome/fb_547_genome.fa \
@@ -367,7 +368,7 @@ cd /data/tophat_cufflinks/we04to06h
 gzip cufflinks2/*
 
 cd /data/tophat_cufflinks/we06to08h
-/data/apps/cufflinks/cufflinks -p 8 --compatible-hits-norm -I 5000 \
+/data/apps/cufflinks/cufflinks -p 4 --compatible-hits-norm -I 5000 \
 	-G /data/tophat_cufflinks/fb-r5.47.gtf \
 	-u \
 	-b /data/tophat_cufflinks/genome/fb_547_genome.fa \
@@ -382,34 +383,34 @@ Generate R objects for all aligned samples:
 
 ```bash
 cd /data/fastq
-Rscript ~/scripts/bamtoolsr.r -f preMBT_k4_1.bam   -e 123 -n preMBT_k4_1
-Rscript ~/scripts/bamtoolsr.r -f preMBT_k4_2.bam   -e 115 -n preMBT_k4_2
-Rscript ~/scripts/bamtoolsr.r -f preMBT_pol_1.bam  -e 106 -n preMBT_pol_1
-Rscript ~/scripts/bamtoolsr.r -f preMBT_pol_2.bam  -e 127 -n preMBT_pol_2
-Rscript ~/scripts/bamtoolsr.r -f preMBT_pol_3.bam  -e 118 -n preMBT_pol_3
-Rscript ~/scripts/bamtoolsr.r -f preMBT_pol_4.bam  -e 150 -n preMBT_pol_4
-Rscript ~/scripts/bamtoolsr.r -f preMBT_tbp_1.bam  -e 91  -n preMBT_tbp_1
-Rscript ~/scripts/bamtoolsr.r -f preMBT_tbp_2.bam  -e 110 -n preMBT_tbp_2
-Rscript ~/scripts/bamtoolsr.r -f preMBT_wce_1.bam  -e 146 -n preMBT_wce_1
-Rscript ~/scripts/bamtoolsr.r -f MBT_h3ac_1.bam    -e 90  -n MBT_h3ac_1
-Rscript ~/scripts/bamtoolsr.r -f MBT_h3ac_2.bam    -e 131 -n MBT_h3ac_2
-Rscript ~/scripts/bamtoolsr.r -f MBT_k27_1.bam     -e 120 -n MBT_k27_1
-Rscript ~/scripts/bamtoolsr.r -f MBT_k4_1.bam      -e 84  -n MBT_k4_1
-Rscript ~/scripts/bamtoolsr.r -f MBT_k4_2.bam      -e 113 -n MBT_k4_2
-Rscript ~/scripts/bamtoolsr.r -f MBT_pol_1.bam     -e 161 -n MBT_pol_1
-Rscript ~/scripts/bamtoolsr.r -f MBT_pol_2.bam     -e 113 -n MBT_pol_2
-Rscript ~/scripts/bamtoolsr.r -f MBT_pol_3.bam     -e 95  -n MBT_pol_3
-Rscript ~/scripts/bamtoolsr.r -f MBT_tbp_1.bam     -e 173 -n MBT_tbp_1
-Rscript ~/scripts/bamtoolsr.r -f MBT_tbp_2.bam     -e 86  -n MBT_tbp_2
-Rscript ~/scripts/bamtoolsr.r -f MBT_wce_1.bam     -e 133 -n MBT_wce_1
-Rscript ~/scripts/bamtoolsr.r -f postMBT_k27_1.bam -e 147 -n postMBT_k27_1
-Rscript ~/scripts/bamtoolsr.r -f postMBT_pol_1.bam -e 78  -n postMBT_pol_1
-Rscript ~/scripts/bamtoolsr.r -f postMBT_tbp_1.bam -e 81  -n postMBT_tbp_1
-Rscript ~/scripts/bamtoolsr.r -f postMBT_wce_1.bam -e 113 -n postMBT_wce_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f preMBT_k4_1.bam   -e 123 -n preMBT_k4_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f preMBT_k4_2.bam   -e 115 -n preMBT_k4_2
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f preMBT_pol_1.bam  -e 106 -n preMBT_pol_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f preMBT_pol_2.bam  -e 127 -n preMBT_pol_2
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f preMBT_pol_3.bam  -e 118 -n preMBT_pol_3
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f preMBT_pol_4.bam  -e 150 -n preMBT_pol_4
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f preMBT_tbp_1.bam  -e 91  -n preMBT_tbp_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f preMBT_tbp_2.bam  -e 110 -n preMBT_tbp_2
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f preMBT_wce_1.bam  -e 146 -n preMBT_wce_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_h3ac_1.bam    -e 90  -n MBT_h3ac_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_h3ac_2.bam    -e 131 -n MBT_h3ac_2
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_k27_1.bam     -e 120 -n MBT_k27_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_k4_1.bam      -e 84  -n MBT_k4_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_k4_2.bam      -e 113 -n MBT_k4_2
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_pol_1.bam     -e 161 -n MBT_pol_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_pol_2.bam     -e 113 -n MBT_pol_2
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_pol_3.bam     -e 95  -n MBT_pol_3
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_tbp_1.bam     -e 173 -n MBT_tbp_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_tbp_2.bam     -e 86  -n MBT_tbp_2
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_wce_1.bam     -e 133 -n MBT_wce_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f postMBT_k27_1.bam -e 147 -n postMBT_k27_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f postMBT_pol_1.bam -e 78  -n postMBT_pol_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f postMBT_tbp_1.bam -e 81  -n postMBT_tbp_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f postMBT_wce_1.bam -e 113 -n postMBT_wce_1
 
 # paired-end
-Rscript ~/scripts/bamtoolsr.r -f 06to08h_k27_1.bam -p     -n 06to08h_k27_1
-Rscript ~/scripts/bamtoolsr.r -f MBT_mnase_1.bam   -p     -n MBT_mnase_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f 06to08h_k27_1.bam -p     -n 06to08h_k27_1
+Rscript ~/analysis_code/shared_code/bamtoolsr.r -f MBT_mnase_1.bam   -p     -n MBT_mnase_1
 
 # move files
 mkdir /data/bam
