@@ -1,6 +1,6 @@
 # eLife 2013 paper analysis code
 
-This repository holds the analysis code for our eLife 2013 paper. We performed most of the analysis using [R](http://www.r-project.org) and [Bioconductor](http://www.bioconductor.org), as well as some shell scripts to call additional tools.
+This repository holds the analysis code for our [eLife 2013 paper](http://elife.elifesciences.org/content/2/e00861). We performed most of the analysis using [R](http://www.r-project.org) and [Bioconductor](http://www.bioconductor.org), as well as some shell scripts to call additional tools.
 
 If you are interested in running this code to reproduce our analysis, we recommend you use our pre-configured Amazon Machine Image (AMI). The image has appropriate versions of all required software and includes the raw and processed data files. You can find more information about the AMI at [http://research.stowers.org/zeitlingerlab/data](http://research.stowers.org/zeitlingerlab/data).
 
